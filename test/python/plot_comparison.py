@@ -4,7 +4,12 @@ import json
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
+from matplotlib.lines import Line2D
 
+
+first_run_dots = True # Flag indicating whether to plot blue/orange dots for Python/Julia first-run times
+
+plt.rcParams.update({"font.size": 6})
 
 # Load benchmark results
 with open(".benchmarks/py-bench.json") as f:
@@ -20,7 +25,7 @@ all_funcs = list(set(py_times.keys()) | set(jl_times.keys()))
 all_funcs.sort(key=lambda f: max(np.median(py_times.get(f, 0)), np.median(jl_times.get(f, 0))), reverse=True)
 
 # Create paired boxplots
-fig, ax = plt.subplots(figsize=(14, 6))
+fig, ax = plt.subplots(figsize=(8.5-.7*2, 3.5))
 
 positions = []
 data = []
@@ -46,7 +51,7 @@ bp = ax.boxplot(
     capprops=dict(lw=0.5), 
     widths=1.0, 
     patch_artist=True, 
-    #whis=(0,100),
+    # whis=(0,100),
     showfliers=False
 )
 for patch, color in zip(bp['boxes'], colors):
@@ -62,14 +67,18 @@ for j, func in enumerate(all_funcs):
         
         # Position text at the center between the two boxplots
         x_pos = 3*j + 1.5
-        # Position above the higher boxplot
+        
+        # Position above the higher boxplot (and first-run dots if enabled)
         py_max = bp['whiskers'][2*i+1].get_data()[1][-1]
         jl_max = bp['whiskers'][2*i+3].get_data()[1][-1]
-        y_pos = max(py_max, jl_max) * 1.4
+        top = max(py_max, jl_max)
+        if first_run_dots:
+            top = max(top, py_times[func][0], jl_times[func][0])
+        y_pos = top * 1.8
         
         ax.text(
             x_pos, y_pos, f'{speedup:.1f}×', 
-            ha='center', va='bottom', fontsize=8, 
+            ha='center', va='bottom', fontsize=5, 
             bbox=dict(
                 boxstyle='round,pad=0.3', facecolor='white', 
                 edgecolor='gray', alpha=0.8, linewidth=0.5
@@ -79,12 +88,26 @@ for j, func in enumerate(all_funcs):
     elif func in py_times or func in jl_times:
         i += 1
 
+# Add orange dots for Julia first-run times
+if first_run_dots:
+    py_dot_plotted = False
+    jl_dot_plotted = False
+    for j, func in enumerate(all_funcs):
+        if func in py_times:
+            first_run = py_times[func][0]
+            ax.plot(3*j + 1, first_run, 'o', color='lightblue', markeredgecolor='black', markeredgewidth=0.3, markersize=3, zorder=5, label='Python first run' if not py_dot_plotted else "")
+            py_dot_plotted = True
+        if func in jl_times:
+            first_run = jl_times[func][0]
+            ax.plot(3*j + 2, first_run, 'o', color='orange', markeredgecolor='black', markeredgewidth=0.3, markersize=3, zorder=5, label='Julia first run' if not jl_dot_plotted else "")
+            jl_dot_plotted = True
+
 ax.set_xticks([3*i + 1.5 for i in range(len(all_funcs))])
 ax.set_xticklabels(all_funcs, rotation=45, ha='right')
-ax.set_xlabel("Toolbox Function")
+ax.set_xlabel("Toolbox Function", fontsize=8)
 ax.set_yscale('log')
-ax.set_ylabel("Execution Time (s)")
-ax.set_title("Genqo Benchmark Comparison")
+ax.set_ylabel("Execution Time (s)", fontsize=8)
+ax.set_title("Genqo Benchmark Comparison", fontsize=8)
 ax.grid(axis='y', alpha=0.3)
 
 # Add legend
@@ -92,6 +115,11 @@ legend_elements = [
     Patch(facecolor='lightblue', label='Python toolbox'),
     Patch(facecolor='lightcoral', label='Julia toolbox')
 ]
+if first_run_dots:
+    legend_elements += [
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Python first run'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='orange', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Julia first run'),
+    ]
 ax.legend(handles=legend_elements, loc='upper right')
 
 fig.tight_layout()
