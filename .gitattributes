@@ -1,2 +1,2 @@
 tutorial/* linguist-documentation
-genqo_old_pkg/** linguist-vendored
+test/genqo_old_pkg/** linguist-vendored
