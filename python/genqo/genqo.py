@@ -71,7 +71,16 @@ def _jl_call(jl_func, *args, ref_args=()):
         else:
             jl_args.append(a)
 
-    return np.asarray(jl.broadcast(jl_func, *jl_args, *converted_ref))
+    result = np.asarray(jl.broadcast(jl_func, *jl_args, *converted_ref))
+
+    # When the Julia function returns matrices/vectors, np.asarray produces an
+    # object array of Julia arrays. Stack them into a single dense ndarray.
+    if result.dtype == object:
+        result = np.stack([np.asarray(x) for x in result.flat]).reshape(
+            *result.shape, *np.asarray(result.flat[0]).shape
+        )
+
+    return result
 
 def _ge(bound):
     """attrs validator: value >= bound, works with scalars and ndarrays."""
