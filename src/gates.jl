@@ -15,10 +15,26 @@ num_qubits(::Linear2QubitGate) = 2
 
 function getTransformMatrix(gate::Linear2QubitGate, i::Int, j::Int, mds::Int)::Matrix{Float64}
     S = Matrix{Float64}(I, 2*mds, 2*mds)
-    S[i,i] = S[j,j] = S[mds+i,mds+i] = S[mds+j,mds+j] = gate.S[1,1]
-    S[i,j] = S[mds+i,mds+j] = gate.S[1,2]
-    S[j,i] = S[mds+j,mds+i] = gate.S[2,1]
-    S[j,j] = S[mds+j,mds+j] = gate.S[2,2]
+    idx = [i, j, i+mds, j+mds]
+    @views S[idx,idx] .= gate.S
+
+    """
+    Effectively sets rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
+    This does the equivalent of:
+
+    S[i,i] = gate.S[1,1]
+    S[i,j] = gate.S[1,2]
+    S[j,i] = gate.S[2,1]
+    S[j,j] = gate.S[2,2]
+
+    S[i+mds,i] = gate.S[3,1]
+    S[i+mds,j] = gate.S[3,2]
+    S[j+mds,i] = gate.S[4,1]
+    S[j+mds,j] = gate.S[4,2]
+
+    ...
+
+    """
 
     return S
 end
@@ -28,13 +44,27 @@ function expand(gate::Linear2QubitGate, indices::Vector{Int}, mds::Int)::Linear2
 end
 
 function apply!(gate::Linear2QubitGate, V::Matrix{Float64})
-    V = gate.S * V * gate.S'
+    V .= gate.S * V * gate.S'
 end
+
+# All gates in qqpp representation
 
 BeamSplitter(t::Real=0.5)::Linear2QubitGate = Linear2QubitGate(
     [
-        sqrt(t)  sqrt(1-t);
-        -sqrt(1-t) sqrt(t);
+        sqrt(t)     sqrt(1-t)  0           0         ;
+        -sqrt(1-t)  sqrt(t)    0           0         ;
+        0           0          sqrt(t)     sqrt(1-t) ;
+        0           0          -sqrt(1-t)  sqrt(t)   ;
+    ]
+)
+
+# TODO: add φ parameter
+Squeeze2Mode(r::Real, φ::Real=0)::Linear2QubitGate = Linear2QubitGate(
+    [
+        cosh(r)  sinh(r)  0         0        ;
+        sinh(r)  cosh(r)  0         0        ;
+        0        0        cosh(r)   -sinh(r) ;
+        0        0        -sinh(r)  cosh(r)  ;
     ]
 )
 
