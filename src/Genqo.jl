@@ -14,4 +14,14 @@ import .sigsag
 
 export tools, tmsv, spdc, zalm, sigsag
 
+include("gates.jl")
+include("registers.jl")
+include("circuits.jl")
+
+import .gates
+import .registers
+import .circuits
+
+export gates, registers, circuits
+
 end # module
