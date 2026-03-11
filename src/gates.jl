@@ -68,5 +68,14 @@ Squeeze2Mode(r::Real, φ::Real=0)::Linear2QubitGate = Linear2QubitGate(
     ]
 )
 
+ModeSwap()::Linear2QubitGate = Linear2QubitGate(
+    [
+        0   1   0   0 ;
+        1   0   0   0 ;
+        0   0   0   1 ;
+        0   0   1   0 ;
+    ]
+)
+
 end # module
    
