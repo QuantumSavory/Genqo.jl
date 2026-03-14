@@ -4,6 +4,8 @@ using LinearAlgebra
 using Nemo
 using BlockDiagonals
 
+export wick_out, W, extract_W_terms, permutation_matrix, reorder, k_function_matrix
+
 
 """
 Precompute Wick partitions (perfect pairings) of 1:n
@@ -226,7 +228,5 @@ function k_function_matrix(covariance_matrix::Matrix{Float64})
 
     return K
 end
-
-export wick_out, W, extract_W_terms, permutation_matrix, reorder, k_function_matrix
 
 end # module

@@ -34,21 +34,33 @@ function fuse!(circuit::Circuit)
         # For instance, this could take a 2x2 beamsplitter matrix and produce a 16x16 (8-mode) qqpp matrix applied to modes 3,5
         gate_expanded = expand(gate, indices, circuit.register.mds)
 
-        # Fuse with previous gate if both gates are linear
-        if gate_expanded isa Linear2QubitGate && !isempty(circuit.register.builder.ops_fused)
+        # Fusion rules
+        # Fuse with previous gate if both gates are symplectic
+        if gate_expanded isa SymplecticGate && !isempty(circuit.register.builder.ops_fused)
             prev_gate = circuit.register.builder.ops_fused[end]
-            if prev_gate isa Linear2QubitGate
+            if prev_gate isa SymplecticGate
                 fused_S = gate_expanded.S * prev_gate.S # left-multiply by new gate
-                circuit.register.builder.ops_fused[end] = Linear2QubitGate(fused_S)
+                circuit.register.builder.ops_fused[end] = SymplecticGate(fused_S)
             else
                 push!(circuit.register.builder.ops_fused, gate_expanded)
             end
+
+        # Fuse with previous gate if both gates are loss channels
+        elseif gate_expanded isa LossChannel && !isempty(circuit.register.builder.ops_fused)
+            prev_gate = circuit.register.builder.ops_fused[end]
+            if prev_gate isa LossChannel
+                fused_η = prev_gate.η .* gate_expanded.η # elementwise multiply loss vectors
+                circuit.register.builder.ops_fused[end] = LossChannel(fused_η)
+            else
+                push!(circuit.register.builder.ops_fused, gate_expanded)
+            end
+
+        # Default: push gate with no fusion
         else
             push!(circuit.register.builder.ops_fused, gate_expanded)
         end
     end
 
-    # TODO: have fuser handle qqpp vs qpqp representations
     # TODO Future: add more optimizations
 
     circuit.register.builder.fused = true
@@ -56,10 +68,12 @@ function fuse!(circuit::Circuit)
 end
 
 function run!(circuit::Circuit)
+    # Run fuser to expand gates and optimize circuit
     fuse!(circuit)
 
+    # Apply gates to the covariance matrix in order
     for gate in circuit.register.builder.ops_fused
-        apply!(gate, circuit.register.covariance)
+        apply!(gate, circuit.register.state.covariance)
     end
 end
 

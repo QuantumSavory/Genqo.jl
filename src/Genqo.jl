@@ -14,14 +14,16 @@ import .sigsag
 
 export tools, tmsv, spdc, zalm, sigsag
 
+include("states.jl")
 include("gates.jl")
 include("registers.jl")
 include("circuits.jl")
 
+import .states
 import .gates
 import .registers
 import .circuits
 
-export gates, registers, circuits
+export states, gates, registers, circuits
 
 end # module
