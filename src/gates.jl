@@ -2,64 +2,47 @@ module gates
 
 using LinearAlgebra
 
-export Gate, num_qubits, Linear2QubitGate, getTransformMatrix, expand, apply!, BeamSplitter
+export Gate, num_qubits, SymplecticGate, getTransformMatrix, expand, apply!, BeamSplitter, Squeeze2Mode, ModeSwap, LossChannel
 
 
 abstract type Gate end
 num_qubits(::Gate) = -1 # Any number of qubits
 
-struct Linear2QubitGate <: Gate
+struct SymplecticGate <: Gate
     S::Matrix{Float64}
 end
-num_qubits(::Linear2QubitGate) = 2
+num_qubits(::SymplecticGate) = 2
 
-function getTransformMatrix(gate::Linear2QubitGate, i::Int, j::Int, mds::Int)::Matrix{Float64}
+function getTransformMatrix(gate::SymplecticGate, indices::Vector{Int}, mds::Int)::Matrix{Float64}
+    # Set rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
     S = Matrix{Float64}(I, 2*mds, 2*mds)
-    idx = [i, j, i+mds, j+mds]
+    idx = [indices; (indices .+ mds)]
     @views S[idx,idx] .= gate.S
-
-    """
-    Effectively sets rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
-    This does the equivalent of:
-
-    S[i,i] = gate.S[1,1]
-    S[i,j] = gate.S[1,2]
-    S[j,i] = gate.S[2,1]
-    S[j,j] = gate.S[2,2]
-
-    S[i+mds,i] = gate.S[3,1]
-    S[i+mds,j] = gate.S[3,2]
-    S[j+mds,i] = gate.S[4,1]
-    S[j+mds,j] = gate.S[4,2]
-
-    ...
-
-    """
 
     return S
 end
 
-function expand(gate::Linear2QubitGate, indices::Vector{Int}, mds::Int)::Linear2QubitGate
-    Linear2QubitGate(getTransformMatrix(gate, indices[1], indices[2], mds))
+function expand(gate::SymplecticGate, indices::Vector{Int}, mds::Int)::SymplecticGate
+    return SymplecticGate(getTransformMatrix(gate, indices, mds))
 end
 
-function apply!(gate::Linear2QubitGate, V::Matrix{Float64})
+function apply!(gate::SymplecticGate, V::Matrix{Float64})
     V .= gate.S * V * gate.S'
 end
 
 # All gates in qqpp representation
 
-BeamSplitter(t::Real=0.5)::Linear2QubitGate = Linear2QubitGate(
+BeamSplitter(t::Real=0.5) = SymplecticGate(
     [
-        sqrt(t)     sqrt(1-t)  0           0         ;
-        -sqrt(1-t)  sqrt(t)    0           0         ;
-        0           0          sqrt(t)     sqrt(1-t) ;
-        0           0          -sqrt(1-t)  sqrt(t)   ;
+        √(t)     √(1-t)  0        0      ;
+        -√(1-t)  √(t)    0        0      ;
+        0        0       √(t)     √(1-t) ;
+        0        0       -√(1-t)  √(t)   ;
     ]
 )
 
 # TODO: add φ parameter
-Squeeze2Mode(r::Real, φ::Real=0)::Linear2QubitGate = Linear2QubitGate(
+Squeeze2Mode(r::Real, φ::Real=0) = SymplecticGate(
     1/sqrt(2) * 
     [
         cosh(r)  sinh(r)  0         0        ;
@@ -69,7 +52,7 @@ Squeeze2Mode(r::Real, φ::Real=0)::Linear2QubitGate = Linear2QubitGate(
     ]
 )
 
-ModeSwap()::Linear2QubitGate = Linear2QubitGate(
+ModeSwap() = SymplecticGate(
     [
         0   1   0   0 ;
         1   0   0   0 ;
@@ -78,5 +61,40 @@ ModeSwap()::Linear2QubitGate = Linear2QubitGate(
     ]
 )
 
+
+abstract type Channel <: Gate end
+
+struct LossChannel <: Channel
+    η::Vector{Real}
+end
+
+function expand(ch::LossChannel, indices::Vector{Int}, mds::Int)::LossChannel
+    expanded = ones(Float64, mds)
+    if size(ch.η) == (1,)
+        expanded[indices] .= ch.η[1]
+    else
+        @assert size(ch.η) == size(indices) "LossChannel η vector must have length equal to number of modes specified, but got length $(size(ch.η)) applied to $(size(indices)) modes"
+        expanded[indices] .= ch.η
+    end
+    return LossChannel(expanded)
+end
+
+function apply!(ch::LossChannel, V::Matrix{Float64})
+    # Loss Channel applies as γ ↦ ηγ + (1-η)I/2, where γ is a 2x2 submatrix of the covariance matrix V representing just one mode.
+    # Here, η is a vector meant to apply to every mode.
+    η = ch.η
+    mds = length(η)
+    for i in 1:mds
+        if η[i] == 1 continue end
+        idx = [i, i+mds]
+        V[idx, idx] .*= η[i]
+        V[idx, idx] .+= (1-η[i])*I(2)/2 # TODO: ask Gabe if this should be I or I/2
+    end
+end
+
+function LossChannel(η::Real...)
+    @assert all(0 .≤ η .≤ 1) "All loss values must be between 0 and 1"
+    return LossChannel(collect(η))
+end
+
 end # module
-   
