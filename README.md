@@ -38,7 +38,7 @@ Genqo.jl is coming soon to the Julia package registry and to PyPi. Until then, t
 2. Run the following commands in a terminal:
 
 ```bash
-git clone https://github.com/JacobGunnell/Genqo.jl
+git clone https://github.com/QuantumSavory/Genqo.jl
 cd Genqo.jl
 julia --project=.
 ```
