@@ -2,70 +2,20 @@ name: Release
 
 on:
   workflow_dispatch:
-    inputs:
-      version_part:
-        description: "Version bump type"
-        required: true
-        type: choice
-        options:
-          - patch
-          - minor
-          - major
 
 permissions:
   contents: write
-  id-token: write
 
 jobs:
-  release:
-    name: Bump, Tag & Publish
+  register:
+    name: Register with Julia General Registry
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install tools
-        run: pip install bump-my-version build
-
-      - name: Configure git
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Bump version
-        run: bump-my-version bump ${{ inputs.version_part }}
-
-      - name: Push commit and tag
-        run: git push --follow-tags
-
-      - name: Get new version
-        id: version
-        run: echo "version=$(bump-my-version show current_version)" >> "$GITHUB_OUTPUT"
-
-      - name: Build Python package
-        run: python -m build python/
-
-      - name: Create GitHub Release
+      - name: Comment @JuliaRegistrator register
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: >
-          gh release create "v${{ steps.version.outputs.version }}"
-          --generate-notes
-          --title "v${{ steps.version.outputs.version }}"
-
-      - name: Publish to PyPI
-        uses: pypa/gh-action-pypi-publish@release/v1
-        with:
-          packages-dir: python/dist/
-
-      - name: Register with Julia General Registry
-        env:
-          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: >
-          gh api "repos/${{ github.repository }}/commits/v${{ steps.version.outputs.version }}/comments"
+          gh api "repos/${{ github.repository }}/commits/${{ github.sha }}/comments"
           -f body="@JuliaRegistrator register"
