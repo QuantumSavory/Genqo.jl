@@ -32,22 +32,15 @@ Genqo.jl allows for simple integration with the full-stack quantum networking te
 
 ## Installation
 
-Genqo.jl is coming soon to the Julia package registry and to PyPi. Until then, the best way to use this new, fast Genqo is to clone this repository and build from source.
-
-1. [Install Julia](https://julialang.org/downloads/)
-2. Run the following commands in a terminal:
-
-```bash
-git clone https://github.com/QuantumSavory/Genqo.jl
-cd Genqo.jl
-julia --project=.
+Simply install Genqo.jl using Pkg:
+```julia
+using Pkg
+Pkg.add("Genqo")
 ```
-
-3. In the Julia window, run `using Pkg; Pkg.instantiate()` to install the required dependencies. Now simply type `using Genqo` to import the Genqo package!
 
 ## Quickstart
 
-Try running the [tutorial notebook](tutorial/hybrid_model_jl.ipynb) for an introduction to Genqo.jl's structure and functionality.
+Try running the [tutorial notebook](docs/tutorial/hybrid_model_jl.ipynb) for an introduction to Genqo.jl's structure and functionality.
 
 ## Contact
 

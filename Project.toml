@@ -10,15 +10,9 @@ Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 
 [compat]
 julia = "1.12"
-BenchmarkTools = "1.6.3"
 BlockDiagonals = "0.2.0"
 LinearAlgebra = "1.12.0"
 Nemo = "0.53.2"
-Test = "1.11.0"
 
-[extras]
-BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
-Test = "8dfed614-e22c-5e08-85e1-65c5234f0b40"
-
-[targets]
-test = ["Test", "BenchmarkTools"]
+[workspace]
+projects = ["test", "docs"]
