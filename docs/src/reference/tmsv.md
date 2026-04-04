@@ -1,9 +1,6 @@
 # [TMSV](@id tmsv_ref)
 
-The `tmsv` module models a Two-Mode Squeezed Vacuum (TMSV) state — the simplest Gaussian
-entangled state. Both modes are produced by a single parametric interaction and characterized
-by the mean photon number μ. This source is primarily used as a building block for the SPDC
-and ZALM modules and as a validation baseline.
+The `tmsv` module models a Two-Mode Squeezed Vacuum (TMSV) state — the simplest Gaussian entangled state. Both modes are produced by a single parametric interaction and characterized by the mean photon number μ. This source is primarily used as a building block for the SPDC and ZALM modules and as a validation baseline.
 
 ## Type
 

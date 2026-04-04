@@ -1,9 +1,6 @@
 # [SIGSAG](@id sigsag_ref)
 
-The `sigsag` module models a Sagnac-loop (single-pass) entanglement source. A single SPDC
-crystal is placed inside a Sagnac interferometer; the counter-propagating modes are routed
-through a BSM beamsplitter network. Compared to ZALM, the Sagnac architecture uses fewer
-optical components and has no cascaded BSM stage.
+The `sigsag` module models a Sagnac-loop (single-pass) entanglement source. A single SPDC crystal is placed inside a Sagnac interferometer; the counter-propagating modes are routed through a BSM beamsplitter network. Compared to ZALM, the Sagnac architecture uses fewer optical components and has no cascaded BSM stage.
 
 ## Type
 

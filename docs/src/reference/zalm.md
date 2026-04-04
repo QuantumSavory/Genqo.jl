@@ -1,9 +1,6 @@
 # [ZALM](@id zalm_ref)
 
-The `zalm` module models a cascaded ZALM entanglement source, in which two SPDC sources are
-combined at a central Bell-state measurement (BSM) station. A coincidence click at the BSM
-heralds a remote entangled spin-spin state. Dark counts and all three efficiency channels
-(detection, outcoupling, BSM) can be modelled.
+The `zalm` module models a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source, in which two SPDC sources are combined at a central Bell-state measurement (BSM) station. A coincidence click at the BSM heralds a remote entangled spin-spin state. Dark counts and all three efficiency channels (detection, outcoupling, BSM) can be modeled.
 
 ## Type
 

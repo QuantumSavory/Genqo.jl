@@ -11,12 +11,12 @@ using ..tools
 """
     ZALM
 
-Parameters for a cascaded ZALM entanglement source.
+Parameters for a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source.
 
 The ZALM architecture uses two SPDC sources whose idler photons are interfered on a
 beamsplitter for a Bell-state measurement (BSM). A coincidence click heralds a
 remote entangled state between the two remaining signal photons. Dark counts and all
-three efficiency channels can be modelled.
+three efficiency channels can be modeled.
 
 # Fields
 - `mean_photon::Real`           : Mean photon number per pair per SPDC source (default `1e-2`)

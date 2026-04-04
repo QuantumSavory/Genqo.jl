@@ -1,8 +1,6 @@
 # [SPDC](@id spdc_ref)
 
-The `spdc` module models a Spontaneous Parametric Down-Conversion entanglement source. A single
-nonlinear crystal generates entangled photon pairs; the heralding photons pass through a
-Bell-state measurement that projects the remote spin qubits into an entangled state.
+The `spdc` module models a Spontaneous Parametric Down-Conversion entanglement source. A single nonlinear crystal generates entangled photon pairs; the heralding photons pass through a Bell-state measurement that projects the remote spin qubits into an entangled state.
 
 ## Type
 

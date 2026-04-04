@@ -1,8 +1,6 @@
 # Tools
 
-The `tools` module provides the core mathematical machinery shared by all source modules:
-Gaussian moment evaluation via Wick's theorem, covariance matrix utilities, and the
-K-matrix construction used to form the contraction kernel.
+The `tools` module provides the core mathematical machinery shared by all source modules: Gaussian moment evaluation via Wick's theorem, covariance matrix utilities, and the K-matrix construction used to form the contraction kernel.
 
 ## Wick Contraction
 
