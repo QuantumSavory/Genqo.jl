@@ -16,3 +16,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comparison test suite validating Julia against reference Python implementation
 - Benchmark suite for Julia and Python performance comparison
 - CI/CD workflows for testing, releasing, and publishing
+- API documentation

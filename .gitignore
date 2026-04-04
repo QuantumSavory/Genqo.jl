@@ -4,6 +4,9 @@ __pycache__/
 .benchmarks/
 .venv/
 *.egg-info/
+.claude/
 
 Manifest.toml
 **/Manifest.toml
+
+docs/build/

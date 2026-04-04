@@ -23,6 +23,15 @@ bench func="":
     pytest test/python/test_gqpy_bench.py{{ if func != "" { "::test_" + replace(func, '.', '__') } else { "" } }} --benchmark-json=.benchmarks/py-bench.json && \
     python test/python/plot_comparison.py
 
+# Build documentation (requires nbconvert: pip install nbconvert)
+build-docs:
+    julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
+    julia --project=docs/ docs/make.jl
+
+# Bump version: just bump patch | minor | major
+bump part:
+    bump-my-version bump {{part}}
+
 # Create virtual environment for Python wrapper
 venv:
     if [ ! -d python/.venv ]; then \

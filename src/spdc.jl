@@ -8,6 +8,21 @@ import ..tmsv
 using ..tools
 
 
+"""
+    SPDC
+
+Parameters for a Spontaneous Parametric Down-Conversion (SPDC) entanglement source.
+
+An SPDC source generates entangled photon pairs via a single nonlinear crystal. The two signal
+photons are coupled out and detected; a Bell-state measurement on the heralding modes
+projects the remote spin qubits into an entangled state.
+
+# Fields
+- `mean_photon::Real`           : Mean photon number per pair (default `1e-2`)
+- `detection_efficiency::Real`  : Detector efficiency, ∈ [0, 1] (default `1.0`)
+- `bsm_efficiency::Real`        : Bell-state measurement efficiency, ∈ [0, 1] (default `1.0`)
+- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
+"""
 Base.@kwdef mutable struct SPDC
     mean_photon::Real = 1e-2
     detection_efficiency::Real = 1.0
@@ -35,7 +50,19 @@ R, generators = polynomial_ring(CC, all_qps)
 _perm_matrix_12785634 = permutation_matrix([1,2,7,8,5,6,3,4])
 
 """
-Calculate the covariance matrix of the SPDC source
+    covariance_matrix(μ::Real)
+
+Construct the 8×8 covariance matrix for an SPDC source.
+
+Builds two TMSV covariance matrices (one per signal-idler pair), assembles them as a
+block-diagonal, and applies the mode permutation that interleaves the pairs into SPDC
+ordering.
+
+# Parameters
+- μ: Mean photon number per pair
+
+# Returns
+8×8 `Float64` covariance matrix in qpqp ordering.
 """
 function covariance_matrix(μ::Real)
     tmsv_covar = tmsv.covariance_matrix(μ)
@@ -46,7 +73,19 @@ end
 covariance_matrix(spdc::SPDC) = covariance_matrix(spdc.mean_photon)
 
 """
-Calculate the loss portion of the A matrix, specifically when calculating the fidelity.
+    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+
+Construct the 16×16 loss matrix for SPDC fidelity calculations.
+
+Encodes the combined transmission-detection loss η = ηᵗηᵈ for all four signal modes.
+The resulting matrix is added to the K-matrix before Wick evaluation of Bell-state overlap terms.
+
+# Parameters
+- ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
+- ηᵈ: Detection efficiency, ∈ [0, 1]
+
+# Returns
+16×16 `ComplexF64` loss matrix for fidelity: `A = k_function_matrix(cov) + loss_bsm_matrix_fid(ηᵗ, ηᵈ)`.
 """
 function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
     G = zeros(ComplexF64, 16, 16)
@@ -80,21 +119,23 @@ loss_bsm_matrix_trace::Matrix{ComplexF64} = begin
 end
 
 """
-    dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+    dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
 
-Calculate a single element of the unnormalized density matrix.
+Calculate a single element of the unnormalized spin-spin density matrix for the SPDC source.
+
+Constructs the symbolic moment polynomial for the (dmi, dmj) Bell-basis element from the
+combined detection and BSM mode operators, then evaluates it via Wick contraction against `Ainv`.
 
 # Parameters
-- dmi : Row number for the corresponding density matrix element
-- dmj : Column number for the corresponding density matrix element
-- Ainv : Numerical inverse of the A matrix
-- nvec : The vector of nᵢ's for the system, where nᵢ is the number of photons in mode i
-- ηᵗ : Transmission efficiency
-- ηᵈ : Detection efficiency
-- ηᵇ : Bell state measurement efficiency
+- dmi  : Row index of the density matrix element (1–4, indexing the four Bell states)
+- dmj  : Column index of the density matrix element (1–4)
+- Ainv : Inverse A-matrix (from `k_function_matrix` + `loss_bsm_matrix_fid`)
+- nvec : Photon-number vector `[n₁, n₂, n₃, n₄]` for the four signal modes
+- ηᵗ   : Outcoupling / transmission efficiency
+- ηᵈ   : Detection efficiency
 
 # Returns
-Density matrix element for the ZALM source
+Complex density matrix element ρ[dmi, dmj] (unnormalized).
 """
 function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
     η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
@@ -164,19 +205,22 @@ function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, 
 end
 
 """
-    spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, nvec::Vector{Int})
+    spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})
 
-Calculate the density operator of the single-mode ZALM source on the spin-spin state.
+Calculate the 4×4 spin-spin density matrix for the SPDC source conditioned on photon-number
+measurement outcome `nvec`.
+
+Assembles the full density matrix by calling `dmijZ` for each (i, j) pair and normalizing
+by the state-preparation prefactor.
 
 # Parameters
-- μ : Mean photon number
-- ηᵗ : Outcoupling efficiency
-- ηᵈ : Detection efficiency
-- ηᵇ : Bell state measurement efficiency
-- nvec : The vector of nᵢ's for the system, where nᵢ is the number of photons in mode i
+- μ    : Mean photon number per pair
+- ηᵗ   : Outcoupling / transmission efficiency
+- ηᵈ   : Detection efficiency
+- nvec : Photon-number vector `[n₁, n₂, n₃, n₄]` for the four signal modes
 
 # Returns
-Numerical complete spin density matrix
+4×4 `ComplexF64` normalized spin-spin density matrix.
 """
 function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})
     lmat = 4

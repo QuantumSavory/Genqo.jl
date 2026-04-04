@@ -8,6 +8,21 @@ import ..spdc
 using ..tools
 
 
+"""
+    SIGSAG
+
+Parameters for a Sagnac (single-pass) entanglement source.
+
+The SIGSAG architecture uses a single SPDC crystal in a Sagnac loop, generating entangled
+photon pairs that are routed through a BSM beamsplitter network. Compared to ZALM, it uses
+fewer optical components and has no cascaded BSM stage.
+
+# Fields
+- `mean_photon::Real`           : Mean photon number per pair (default `1e-2`)
+- `detection_efficiency::Real`  : Signal detector efficiency, ∈ [0, 1] (default `1.0`)
+- `bsm_efficiency::Real`        : BSM detector efficiency, ∈ [0, 1] (default `1.0`)
+- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
+"""
 Base.@kwdef mutable struct SIGSAG
     mean_photon::Real = 1e-2
     detection_efficiency::Real = 1.0
@@ -55,7 +70,19 @@ _S46 = begin
 end
 
 """
-Calculate the covariance matrix of the single Sagnac source
+    covariance_matrix(μ::Real)
+
+Construct the 24×24 covariance matrix for a SIGSAG source.
+
+Expands the SPDC covariance matrix to 6 modes by padding with vacuum modes (3–6),
+reorders from qpqp to qqpp, then applies the two 50/50 beamsplitter symplectic
+transforms (_S35 and _S46).
+
+# Parameters
+- μ: Mean photon number per pair
+
+# Returns
+24×24 `Float64` covariance matrix in qqpp ordering after beamsplitter transforms.
 """
 function covariance_matrix(μ::Real)
     # Expand SPDC covariance matrix to 6 modes by adding vacuum modes
@@ -72,7 +99,19 @@ end
 covariance_matrix(sigsag::SIGSAG) = covariance_matrix(sigsag.mean_photon)
 
 """
-Calculate the loss portion of the A matrix, specifically when calculating the fidelity.
+    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+
+Construct the 24×24 loss matrix for SIGSAG fidelity calculations.
+
+Encodes per-mode loss: signal/detection modes (1, 2) use ηᵈ; BSM modes (3–6) use ηᵗ.
+Added to the K-matrix before Wick evaluation of Bell-state overlap terms.
+
+# Parameters
+- ηᵗ: Outcoupling / transmission efficiency for BSM modes, ∈ [0, 1]
+- ηᵈ: Signal detection efficiency, ∈ [0, 1]
+
+# Returns
+24×24 `ComplexF64` loss matrix for fidelity calculations.
 """
 function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
     G = zeros(ComplexF64, 4*mds, 4*mds)
@@ -90,7 +129,20 @@ end
 loss_bsm_matrix_fid(sigsag::SIGSAG) = loss_bsm_matrix_fid(sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
 """
-Calculate the loss portion of the A matrix, specifically when calculating probability of success.
+    loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)
+
+Construct the 24×24 loss matrix for SIGSAG probability-of-success calculations.
+
+Similar to `loss_bsm_matrix_fid`, but BSM modes (3–6) are projected onto vacuum (η = 0),
+so that only events with a BSM click and no residual signal photons are counted.
+Signal modes (1, 2) use ηᵈ.
+
+# Parameters
+- ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
+- ηᵈ: Signal detection efficiency, ∈ [0, 1]
+
+# Returns
+24×24 `ComplexF64` loss matrix for probability-of-success calculations.
 """
 function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)
     G = zeros(ComplexF64, 4*mds, 4*mds)
@@ -114,6 +166,23 @@ function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)
 end
 loss_bsm_matrix_pgen(sigsag::SIGSAG) = loss_bsm_matrix_pgen(sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
+"""
+    moment_vector(n1::Vector{Int}, n2::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
+
+Construct the symbolic moment polynomial for a SIGSAG coincidence measurement.
+
+Builds the Nemo polynomial encoding the joint detection event where signal modes (1, 2)
+contribute through ηᵈ and BSM modes (3–6) contribute photon numbers `n1` and `n2` through ηᵗ.
+
+# Parameters
+- n1  : Photon-number vector for BSM modes on one side (length 4)
+- n2  : Photon-number vector for BSM modes on the other side (length 4)
+- ηᵗ  : Outcoupling / transmission efficiency
+- ηᵈ  : Signal detection efficiency
+
+# Returns
+Nemo multivariate polynomial over `ComplexField`.
+"""
 function moment_vector(n1::Vector{Int}, n2::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
     Ca12 = ηᵈ * (α[1]*α[2])
     Cb12 = ηᵈ * (β[1]*β[2])
@@ -125,21 +194,21 @@ function moment_vector(n1::Vector{Int}, n2::Vector{Int}, ηᵗ::Real, ηᵈ::Rea
 end
 
 
-# TODO: review docstrings with Gabe for accuracy
 """
-    probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, dark_counts::Real)
+    probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
 
-Calculate the probability of photon-photon state generation with the given parameters.
+Calculate the probability of photon-photon Bell-state generation for the SIGSAG source.
+
+Evaluates the coincidence probability via Gaussian moment (Wick) contraction using the
+SIGSAG covariance matrix and the probability-of-success loss matrix.
 
 # Parameters
-- μ : Mean photon number
-- ηᵗ : Outcoupling efficiency
+- μ  : Mean photon number per pair
+- ηᵗ : Outcoupling / transmission efficiency
 - ηᵈ : Detection efficiency
-- ηᵇ : Bell state measurement efficiency
-- dark_counts : Probability of click with no photon present
 
 # Returns
-Probability of successful photon-photon state generation
+Real-valued probability of successful photon-photon state generation.
 """
 function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
     cov = covariance_matrix(μ)
@@ -159,19 +228,22 @@ function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
 end
 probability_success(sigsag::SIGSAG) = probability_success(sigsag.mean_photon, sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
-# TODO: complete docstring
 """
     fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
 
-...
+Calculate the Bell-state fidelity of the SIGSAG source under loss.
+
+Computes ⟨Φ|ρ|Φ⟩ / p_gen, where the numerator is the Bell-overlap via Wick contraction
+over all four Bell-basis terms and p_gen is the probability of success, giving the
+post-selected fidelity.
 
 # Parameters
-- μ  : Mean photon number (pair production strength)
+- μ  : Mean photon number per pair
 - ηᵗ : Outcoupling / transmission efficiency
 - ηᵈ : Detection efficiency
 
 # Returns
-Real-valued Bell-state fidelity of the SPDC source for the given parameters.
+Real-valued Bell-state fidelity of the SIGSAG source for the given parameters.
 """
 function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
     cov = covariance_matrix(μ)
