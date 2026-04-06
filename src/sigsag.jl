@@ -11,14 +11,12 @@ using ..tools
 """
     SIGSAG
 
-Parameters for a Sagnac (single-pass) entanglement source.
+Parameters for the heralded entanglement source architecture proposed by Chahine et al.
 
-The SIGSAG architecture uses a single SPDC crystal in a Sagnac loop, generating entangled
-photon pairs that are routed through a BSM beamsplitter network. Compared to ZALM, it uses
-fewer optical components and has no cascaded BSM stage.
+The SIGSAG source is a heralded dual-rail entanglement source architecture proposed by Yousef Chahine et al. as an alternative to the cascaded source architecture. It can be realized with a single Sagnac configured entanglement source, hence the nomenclature of "SIGSAG" for short.
 
 # Fields
-- `mean_photon::Real`           : Mean photon number per pair (default `1e-2`)
+- `mean_photon::Real`           : Mean photon number per mode (default `1e-2`)
 - `detection_efficiency::Real`  : Signal detector efficiency, ∈ [0, 1] (default `1.0`)
 - `bsm_efficiency::Real`        : BSM detector efficiency, ∈ [0, 1] (default `1.0`)
 - `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
@@ -74,12 +72,8 @@ end
 
 Construct the 24×24 covariance matrix for a SIGSAG source.
 
-Expands the SPDC covariance matrix to 6 modes by padding with vacuum modes (3–6),
-reorders from qpqp to qqpp, then applies the two 50/50 beamsplitter symplectic
-transforms (_S35 and _S46).
-
 # Parameters
-- μ: Mean photon number per pair
+- μ: Mean photon number per mode
 
 # Returns
 24×24 `Float64` covariance matrix in qqpp ordering after beamsplitter transforms.
@@ -103,11 +97,11 @@ covariance_matrix(sigsag::SIGSAG) = covariance_matrix(sigsag.mean_photon)
 
 Construct the 24×24 loss matrix for SIGSAG fidelity calculations.
 
-Encodes per-mode loss: signal/detection modes (1, 2) use ηᵈ; BSM modes (3–6) use ηᵗ.
+Encodes per-mode loss: signal/detection modes (1, 2) use ηᵈ; measured modes (3–6) use ηᵗ.
 Added to the K-matrix before Wick evaluation of Bell-state overlap terms.
 
 # Parameters
-- ηᵗ: Outcoupling / transmission efficiency for BSM modes, ∈ [0, 1]
+- ηᵗ: Outcoupling / transmission efficiency for measured modes, ∈ [0, 1]
 - ηᵈ: Signal detection efficiency, ∈ [0, 1]
 
 # Returns
@@ -133,9 +127,7 @@ loss_bsm_matrix_fid(sigsag::SIGSAG) = loss_bsm_matrix_fid(sigsag.outcoupling_eff
 
 Construct the 24×24 loss matrix for SIGSAG probability-of-success calculations.
 
-Similar to `loss_bsm_matrix_fid`, but BSM modes (3–6) are projected onto vacuum (η = 0),
-so that only events with a BSM click and no residual signal photons are counted.
-Signal modes (1, 2) use ηᵈ.
+Similar to `loss_bsm_matrix_fid`, but measured modes (3–6) are traced out. Output modes (1, 2) use ηᵈ.
 
 # Parameters
 - ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
@@ -197,13 +189,10 @@ end
 """
     probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
 
-Calculate the probability of photon-photon Bell-state generation for the SIGSAG source.
-
-Evaluates the coincidence probability via Gaussian moment (Wick) contraction using the
-SIGSAG covariance matrix and the probability-of-success loss matrix.
+Calculate the probability of photon-photon state generation for the SIGSAG source.
 
 # Parameters
-- μ  : Mean photon number per pair
+- μ  : Mean photon number per mode
 - ηᵗ : Outcoupling / transmission efficiency
 - ηᵈ : Detection efficiency
 
@@ -233,12 +222,10 @@ probability_success(sigsag::SIGSAG) = probability_success(sigsag.mean_photon, si
 
 Calculate the Bell-state fidelity of the SIGSAG source under loss.
 
-Computes ⟨Φ|ρ|Φ⟩ / p_gen, where the numerator is the Bell-overlap via Wick contraction
-over all four Bell-basis terms and p_gen is the probability of success, giving the
-post-selected fidelity.
+Computes the Bell-state overlap ⟨Φ|ρ|Φ⟩, where ρ is the normalized photon-photon density matrix following heralding.
 
 # Parameters
-- μ  : Mean photon number per pair
+- μ  : Mean photon number per mode
 - ηᵗ : Outcoupling / transmission efficiency
 - ηᵈ : Detection efficiency
 

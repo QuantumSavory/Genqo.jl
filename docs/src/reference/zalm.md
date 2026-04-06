@@ -1,6 +1,6 @@
 # [ZALM](@id zalm_ref)
 
-The `zalm` module models a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source, in which two SPDC sources are combined at a central Bell-state measurement (BSM) station. A coincidence click at the BSM heralds a remote entangled spin-spin state. Dark counts and all three efficiency channels (detection, outcoupling, BSM) can be modeled.
+The `zalm` module models a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source. The ZALM architecture uses two SPDC sources, interfering half of the modes from each source on a pair of 50/50 beamsplitters to perform a Bell-state measurement (BSM). A heralding click pattern signifies a probabilistic photon-photon Bell state between the output modes. Dark counts and all three efficiency channels can be modeled.
 
 ## Type
 
@@ -23,11 +23,4 @@ Genqo.zalm.covariance_matrix
 Genqo.zalm.loss_bsm_matrix_fid
 Genqo.zalm.loss_bsm_matrix_pgen
 Genqo.zalm.dmijZ
-```
-
-## Moment Polynomials
-
-```@docs
-Genqo.zalm.moment_vector
-Genqo.zalm.moment_terms
 ```

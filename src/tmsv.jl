@@ -64,10 +64,6 @@ covariance_matrix(tmsv::TMSV) = covariance_matrix(tmsv.mean_photon)
 
 Construct the loss contribution to the A-matrix for TMSV probability-of-success calculations.
 
-Builds the 8×8 complex G-matrix encoding detection loss (efficiency ηᵈ) for both
-signal modes, then symmetrizes to obtain the loss term added to the K-matrix before
-Wick evaluation.
-
 # Parameters
 - ηᵈ: Detection efficiency, ∈ [0, 1]
 

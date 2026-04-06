@@ -1,6 +1,6 @@
 # [SPDC](@id spdc_ref)
 
-The `spdc` module models a Spontaneous Parametric Down-Conversion entanglement source. A single nonlinear crystal generates entangled photon pairs; the heralding photons pass through a Bell-state measurement that projects the remote spin qubits into an entangled state.
+The `spdc` module models a source composed of two Two-Mode Squeezed Vacuum (TMSV) states whose idler modes are swapped, realizing what is colloquially called an "SPDC" entanglement source. This is not to be confused with the fact that there are two Spontaneous Parametric Down-Conversion (SPDC) processes occuring. This is a standard unheralded source of dual-rail entangled photon pairs.
 
 ## Type
 
@@ -21,11 +21,4 @@ Genqo.spdc.spin_density_matrix
 Genqo.spdc.covariance_matrix
 Genqo.spdc.loss_bsm_matrix_fid
 Genqo.spdc.dmijZ
-```
-
-## Moment Polynomials
-
-```@docs
-Genqo.spdc.moment_vector
-Genqo.spdc.moment_terms
 ```

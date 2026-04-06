@@ -1,6 +1,8 @@
 using Documenter
+using DocumenterCitations
 using Genqo
 
+bib = CitationBibliography(joinpath(@__DIR__, "src", "references.bib"))
 makedocs(
     sitename = "Genqo.jl",
     modules  = [Genqo, Genqo.tools, Genqo.tmsv, Genqo.spdc, Genqo.zalm, Genqo.sigsag],
@@ -18,4 +20,5 @@ makedocs(
         ],
     ],
     checkdocs = :exports,
+    plugins=[bib],
 )
