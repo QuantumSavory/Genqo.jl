@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genqo"
-version = "1.0.0"
+version = "1.1.0"
 description = "Genqo.jl: A Hybrid Gaussian/Non-Gaussian Quantum Optics State Engine for Entanglement Source Modelling"
 readme = "README.md"
 requires-python = ">=3.9"

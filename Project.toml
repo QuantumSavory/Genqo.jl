@@ -1,6 +1,6 @@
 name = "Genqo"
 uuid = "75f83073-4d85-4669-9473-9dff7d7e5b78"
-version = "1.0.0"
+version = "1.1.0"
 authors = ["Jacob Gunnell <jacob.r.gunnell@gmail.com>"]
 
 [workspace]
