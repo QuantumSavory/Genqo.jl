@@ -182,8 +182,8 @@ arrays and reuses an LU factorization for Γ⁻¹.
 # Returns
 A `ComplexF64` matrix `K` (block diagonal `[BB, conj(BB)]`) suitable for `A = K + loss_matrix`.
 """
-function k_function_matrix(covariance_matrix::Matrix{Float64})
-    Γ = covariance_matrix + (1/2)*I
+function k_function_matrix(covariance::Matrix{Float64})
+    Γ = covariance + (1/2)*I
 
     # Invert Γ via LU (same numerical result as inv(Γ), but lets us reuse LU storage)
     F = lu!(Γ)            # factors in-place

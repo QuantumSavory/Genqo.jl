@@ -2,6 +2,8 @@ module circuits
 
 using ..gates
 using ..registers
+using ..metrics
+using ..detectors
 
 export Circuit, fuse, fuse!, run
 
@@ -71,10 +73,23 @@ function run!(circuit::Circuit)
     # Run fuser to expand gates and optimize circuit
     fuse!(circuit)
 
-    # Apply gates to the covariance matrix in order
+    # Apply gates in order
     for gate in circuit.register.builder.ops_fused
-        apply!(gate, circuit.register.state.covariance)
+        apply!(gate, circuit.register.state)
     end
 end
+
+function analyze!(circuit::Circuit, metrics::Vector{Metric})::Dict{Metric, Any}
+    run!(circuit)
+
+    # Compute each metric, caching intermediate results as needed for efficiency
+    results = Dict{Metric, Any}()
+    cache = Dict{ComputeStep, Any}()
+    for metric in metrics
+        results[metric] = compute!(metric, circuit.register.state, cache)
+    end
+    return results
+end
+analyze!(circuit::Circuit, metric::Metric) = analyze!(circuit, [metric])
 
 end # module

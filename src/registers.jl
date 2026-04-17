@@ -1,9 +1,11 @@
 module registers
 
+using Nemo
 using LinearAlgebra
 
 using ..states
 using ..gates
+using ..detectors
 
 export CircuitBuilder, QuantumRegister, ModeRef
 
@@ -19,13 +21,37 @@ Base.@kwdef mutable struct QuantumRegister
     mds::Int
     state::QuantumState
     builder::CircuitBuilder
+
+    R::Generic.MPolyRing{ComplexFieldElem}
+    qai::Vector{Generic.MPoly{ComplexFieldElem}}
+    pai::Vector{Generic.MPoly{ComplexFieldElem}}
+    qbi::Vector{Generic.MPoly{ComplexFieldElem}}
+    pbi::Vector{Generic.MPoly{ComplexFieldElem}}
+    α::Vector{Generic.MPoly{ComplexFieldElem}}
+    β::Vector{Generic.MPoly{ComplexFieldElem}}
 end
 
 function QuantumRegister(mds::Int)
     # TODO: can we infer the best engine to start with? or at least have user specify
-    state = GaussianState(Matrix{Float64}(I, 2mds, 2mds)) # Start in vacuum state
+    state = VacuumState(mds)
     builder = CircuitBuilder()
-    return QuantumRegister(mds, state, builder)
+
+    # Define canonical phase-space variables for the circuit
+    _qai = ["qa$i" for i in 1:mds]
+    _pai = ["pa$i" for i in 1:mds]
+    _qbi = ["qb$i" for i in 1:mds]
+    _pbi = ["pb$i" for i in 1:mds]
+    all_qps = hcat(_qai, _pai, _qbi, _pbi)
+    CC = ComplexField()
+    i = onei(CC) # Imaginary unit in CC ring
+    R, generators = polynomial_ring(CC, all_qps)
+    (qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
+
+    # Define the alpha and beta vectors
+    α = (qai + i .* pai) / sqrt(2)
+    β = (qbi - i .* pbi) / sqrt(2)
+
+    return QuantumRegister(mds, state, builder, R, qai, pai, qbi, pbi, α, β)
 end
 
 struct ModeRef
@@ -61,7 +87,25 @@ function Base.:(|)(gate::Gate, modes::ModeRef)
 
     # Unset fused flag so the fuser knows to refuse the circuit with the new gate
     modes.register.builder.fused = false
-    return
+    return # TODO: return the gate in some form for consistency
+end
+
+# Support applying a detector to modes. Syntax: dets = detector() << q[6,7]
+# We cannot compute the moment polynomial until we know the detection outcome, so we simply have the detectors remember what modes they were applied to
+function Base.:(<<)(::PhotonNumDetector, modes::ModeRef)
+    if length(modes.indices) == 1
+        return PhotonNumDetector(modes.indices[1])
+    else
+        return [PhotonNumDetector(mode) for mode in modes.indices]
+    end
+end
+
+function Base.:(<<)(::PhotonThresholdDetector, modes::ModeRef)
+    if length(modes.indices) == 1
+        return PhotonThresholdDetector(modes.indices[1])
+    else
+        return [PhotonThresholdDetector(mode) for mode in modes.indices]
+    end
 end
 
 end # module

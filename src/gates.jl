@@ -1,8 +1,14 @@
 module gates
 
+using Nemo
 using LinearAlgebra
 
-export Gate, num_qubits, SymplecticGate, getTransformMatrix, expand, apply!, BeamSplitter, Squeeze2Mode, ModeSwap, LossChannel
+using ..states: GaussianState
+using ..detectors: DetectionOutcome
+using ..tools: W, k_function_matrix
+
+export Gate, num_qubits, SymplecticGate, getTransformMatrix, expand, apply!, apply, BeamSplitter, Squeeze2Mode, ModeSwap, LossChannel
+export ModeProjection, FockProjection, TraceOut, Remaining, Detector, PhotonNumDetector, PhotonThresholdDetector, FormalismTransition, GaussiantoCoherent
 
 
 abstract type Gate end
@@ -26,8 +32,8 @@ function expand(gate::SymplecticGate, indices::Vector{Int}, mds::Int)::Symplecti
     return SymplecticGate(getTransformMatrix(gate, indices, mds))
 end
 
-function apply!(gate::SymplecticGate, V::Matrix{Float64})
-    V .= gate.S * V * gate.S'
+function apply!(gate::SymplecticGate, st::GaussianState)
+    st.covariance .= gate.S * st.covariance * gate.S'
 end
 
 # All gates in qqpp representation
@@ -41,16 +47,21 @@ BeamSplitter(t::Real=0.5) = SymplecticGate(
     ]
 )
 
-# TODO: add φ parameter
-Squeeze2Mode(r::Real, φ::Real=0) = SymplecticGate(
-    1/sqrt(2) * 
-    [
-        cosh(r)  sinh(r)  0         0        ;
-        sinh(r)  cosh(r)  0         0        ;
-        0        0        cosh(r)   -sinh(r) ;
-        0        0        -sinh(r)  cosh(r)  ;
-    ]
-)
+Squeeze2Mode(r::Real, φ::Real=0) = begin
+    coshr = cosh(r)
+    sinhr = sinh(r)
+    cosφ = cos(φ)
+    sinφ = sin(φ)
+    SymplecticGate(
+        1/sqrt(2) * 
+        [
+            coshr       cosφ*sinhr  0            sinφ*sinhr  ;
+            cosφ*sinhr  coshr       sinφ*sinhr   0           ;
+            0           sinφ*sinhr  coshr        -cosφ*sinhr ;
+            sinφ*sinhr  0           -cosφ*sinhr  coshr       ;
+        ]
+    )
+end
 
 ModeSwap() = SymplecticGate(
     [
@@ -79,22 +90,42 @@ function expand(ch::LossChannel, indices::Vector{Int}, mds::Int)::LossChannel
     return LossChannel(expanded)
 end
 
-function apply!(ch::LossChannel, V::Matrix{Float64})
+function apply!(ch::LossChannel, st::GaussianState)
     # Loss Channel applies as γ ↦ ηγ + (1-η)I/2, where γ is a 2x2 submatrix of the covariance matrix V representing just one mode.
     # Here, η is a vector meant to apply to every mode.
+    # TODO: derive this formula by applying beamsplitter w/ vacuum and tracing out vacuum
     η = ch.η
+    V = st.covariance
     mds = length(η)
     for i in 1:mds
         if η[i] == 1 continue end
         idx = [i, i+mds]
         V[idx, idx] .*= η[i]
-        V[idx, idx] .+= (1-η[i])*I(2)/2 # TODO: ask Gabe if this should be I or I/2
+        V[idx, idx] .+= (1-η[i])*I(2)/2
     end
 end
 
 function LossChannel(η::Real...)
     @assert all(0 .≤ η .≤ 1) "All loss values must be between 0 and 1"
     return LossChannel(collect(η))
+end
+
+
+"""
+    build_moment_polynomial(spec::MeasurementSpec, α, β, R)
+
+Build the C polynomial from the paper
+"""
+function build_moment_polynomial(detection_outcome::DetectionOutcome, α::Vector{Generic.MPoly{ComplexFieldElem}}, β::Vector{Generic.MPoly{ComplexFieldElem}}, R::Generic.MPolyRing{ComplexFieldElem})::Generic.MPoly{ComplexFieldElem}
+    C = one(R)
+    for proj in detection_outcome.projections
+        if proj isa FockProjection
+            C *= exp(-(abs(α)^2 + abs(β)^2)/2) * (α*conj(β))^proj.n / factorial(proj.n)
+        elseif proj isa TraceOut
+            C *= exp(-(abs(α)^2 + abs(β)^2)/2 + α*conj(β))
+        end
+    end
+    return C
 end
 
 end # module
