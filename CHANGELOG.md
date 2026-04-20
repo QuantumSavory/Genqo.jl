@@ -7,6 +7,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Benchmarking now saves .json files and plots under `.benchmarks/<ISO-timestamp>_<short-commit-hash>/` instead of overwriting `.benchmarks/py-bench.json`, `.benchmarks/jl-bench.json`, and `.benchmarks/benchmark_comparison.svg`.
+
+### Fixed
+
+- `justfile` now updated to reflect Julia workspaces under `docs/` and `test/`.
+
 ## [1.1.0] - 2026-04-06
 
 ### Added
