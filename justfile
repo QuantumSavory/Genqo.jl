@@ -17,13 +17,15 @@ test:
 
 # Run benchmarks for <func>, e.g. just bench spdc.spin_density_matrix (benchmarks all by default)
 bench func="":
-    @echo "Running benchmarks for Julia and Python genqo..."
-    mkdir -p .benchmarks
-    julia --project=test/ test/bench.jl "{{func}}"
-
-    . python/.venv/bin/activate && \
-    pytest test/python/test_gqpy_bench.py{{ if func != "" { "::test_" + replace(func, '.', '__') } else { "" } }} --benchmark-json=.benchmarks/py-bench.json && \
-    python test/python/plot_comparison.py
+    #!/usr/bin/env bash
+    set -e
+    echo "Running benchmarks for Julia and Python genqo..."
+    BENCH_DIR=".benchmarks/$(date -u +%Y-%m-%dT%H:%M:%S)_$(git rev-parse --short HEAD)"
+    mkdir -p "$BENCH_DIR"
+    julia --project=test/ test/bench.jl "{{func}}" "$BENCH_DIR"
+    . python/.venv/bin/activate
+    pytest test/python/test_gqpy_bench.py{{ if func != "" { "::test_" + replace(func, '.', '__') } else { "" } }} --benchmark-json="$BENCH_DIR/py-bench.json"
+    python test/python/plot_comparison.py "$BENCH_DIR"
 
 # Build documentation
 build-docs:

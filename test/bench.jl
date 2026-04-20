@@ -1,8 +1,9 @@
 using Genqo
 using BenchmarkTools
 
-# Get optional function filter from command line argument
+# Get optional function filter and output directory from command line arguments
 func_filter = length(ARGS) > 0 ? ARGS[1] : ""
+bench_dir   = length(ARGS) > 1 ? ARGS[2] : ".benchmarks"
 
 uniform(min_val, max_val) = min_val + (max_val-min_val)*rand(Float64)
 log_uniform(min_exp, max_exp) = 10^uniform(min_exp, max_exp)
@@ -95,4 +96,4 @@ for (func, trial) in results
     display(trial)
     println()
 end
-BenchmarkTools.save(".benchmarks/jl-bench.json", results)
+BenchmarkTools.save(joinpath(bench_dir, "jl-bench.json"), results)

@@ -1,20 +1,22 @@
 """Create box and whisker plots comparing benchmark results between Python and Julia genqo implementations."""
 
 import json
+import sys
 import numpy as np
 import matplotlib.pyplot as plt
 from matplotlib.patches import Patch
 from matplotlib.lines import Line2D
 
+bench_dir = sys.argv[1] if len(sys.argv) > 1 else ".benchmarks"
 
 first_run_dots = True # Flag indicating whether to plot blue/orange dots for Python/Julia first-run times
 
 plt.rcParams.update({"font.size": 6})
 
 # Load benchmark results
-with open(".benchmarks/py-bench.json") as f:
+with open(f"{bench_dir}/py-bench.json") as f:
     py = json.load(f)
-with open(".benchmarks/jl-bench.json") as f:
+with open(f"{bench_dir}/jl-bench.json") as f:
     jl = json.load(f)
 
 py_times = {bm["name"].removeprefix("test_").replace("__", "."): np.array(bm["stats"]["data"]) for bm in py["benchmarks"]}
@@ -123,4 +125,4 @@ if first_run_dots:
 ax.legend(handles=legend_elements, loc='upper right')
 
 fig.tight_layout()
-fig.savefig(".benchmarks/benchmark_comparison.svg")
+fig.savefig(f"{bench_dir}/benchmark_comparison.svg")
