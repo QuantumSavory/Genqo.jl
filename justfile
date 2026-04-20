@@ -1,6 +1,8 @@
 # Install genqo.jl and its Python wrapper
 install:
     julia --project=. -e 'using Pkg; Pkg.instantiate()'
+    julia --project=test/ -e 'using Pkg; Pkg.instantiate()'
+    julia --project=docs/ -e 'using Pkg; Pkg.instantiate()'
 
     just venv
     . python/.venv/bin/activate && \
@@ -17,15 +19,14 @@ test:
 bench func="":
     @echo "Running benchmarks for Julia and Python genqo..."
     mkdir -p .benchmarks
-    julia --project=. test/bench.jl "{{func}}"
+    julia --project=test/ test/bench.jl "{{func}}"
 
     . python/.venv/bin/activate && \
     pytest test/python/test_gqpy_bench.py{{ if func != "" { "::test_" + replace(func, '.', '__') } else { "" } }} --benchmark-json=.benchmarks/py-bench.json && \
     python test/python/plot_comparison.py
 
-# Build documentation (requires nbconvert: pip install nbconvert)
+# Build documentation
 build-docs:
-    julia --project=docs/ -e 'using Pkg; Pkg.develop(PackageSpec(path=pwd())); Pkg.instantiate()'
     julia --project=docs/ docs/make.jl
 
 # Bump version: just bump patch | minor | major
