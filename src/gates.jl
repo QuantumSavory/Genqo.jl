@@ -4,7 +4,6 @@ using Nemo
 using LinearAlgebra
 
 using ..states: GaussianState
-using ..detectors: DetectionOutcome
 using ..tools: W, k_function_matrix
 
 export Gate, num_qubits, SymplecticGate, getTransformMatrix, expand, apply!, apply, BeamSplitter, Squeeze2Mode, ModeSwap, LossChannel
@@ -110,22 +109,5 @@ function LossChannel(η::Real...)
     return LossChannel(collect(η))
 end
 
-
-"""
-    build_moment_polynomial(spec::MeasurementSpec, α, β, R)
-
-Build the C polynomial from the paper
-"""
-function build_moment_polynomial(detection_outcome::DetectionOutcome, α::Vector{Generic.MPoly{ComplexFieldElem}}, β::Vector{Generic.MPoly{ComplexFieldElem}}, R::Generic.MPolyRing{ComplexFieldElem})::Generic.MPoly{ComplexFieldElem}
-    C = one(R)
-    for proj in detection_outcome.projections
-        if proj isa FockProjection
-            C *= exp(-(abs(α)^2 + abs(β)^2)/2) * (α*conj(β))^proj.n / factorial(proj.n)
-        elseif proj isa TraceOut
-            C *= exp(-(abs(α)^2 + abs(β)^2)/2 + α*conj(β))
-        end
-    end
-    return C
-end
 
 end # module

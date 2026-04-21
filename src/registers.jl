@@ -7,7 +7,8 @@ using ..states
 using ..gates
 using ..detectors
 
-export CircuitBuilder, QuantumRegister, ModeRef
+export CircuitBuilder, QuantumRegister, ModeRef, DetectionOutcome
+export PhotonNumMeasurement, PhotonThresholdMeasurement, TraceOut
 
 
 Base.@kwdef mutable struct CircuitBuilder
@@ -20,6 +21,7 @@ end
 Base.@kwdef mutable struct QuantumRegister
     mds::Int
     state::QuantumState
+    detectors::Vector{Union{Detector, Nothing}}
     builder::CircuitBuilder
 
     R::Generic.MPolyRing{ComplexFieldElem}
@@ -34,6 +36,7 @@ end
 function QuantumRegister(mds::Int)
     # TODO: can we infer the best engine to start with? or at least have user specify
     state = VacuumState(mds)
+    detectors = fill(nothing, mds) # Initialize with no detectors
     builder = CircuitBuilder()
 
     # Define canonical phase-space variables for the circuit
@@ -47,11 +50,11 @@ function QuantumRegister(mds::Int)
     R, generators = polynomial_ring(CC, all_qps)
     (qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
 
-    # Define the alpha and beta vectors
+    # Define the α and β* vectors (note that we pre-conjugate β)
     α = (qai + i .* pai) / sqrt(2)
     β = (qbi - i .* pbi) / sqrt(2)
 
-    return QuantumRegister(mds, state, builder, R, qai, pai, qbi, pbi, α, β)
+    return QuantumRegister(mds, state, detectors, builder, R, qai, pai, qbi, pbi, α, β)
 end
 
 struct ModeRef
@@ -91,21 +94,48 @@ function Base.:(|)(gate::Gate, modes::ModeRef)
 end
 
 # Support applying a detector to modes. Syntax: dets = detector() << q[6,7]
-# We cannot compute the moment polynomial until we know the detection outcome, so we simply have the detectors remember what modes they were applied to
-function Base.:(<<)(::PhotonNumDetector, modes::ModeRef)
-    if length(modes.indices) == 1
-        return PhotonNumDetector(modes.indices[1])
-    else
-        return [PhotonNumDetector(mode) for mode in modes.indices]
+function Base.:(<<)(detector::Detector, modes::ModeRef)
+    for index in modes.indices
+        @assert isnothing(modes.register.detectors[index]) "Mode $index already has a detector registered, but got multiple detectors applied to the same mode"
+        modes.register.detectors[index] = detector
     end
 end
 
-function Base.:(<<)(::PhotonThresholdDetector, modes::ModeRef)
-    if length(modes.indices) == 1
-        return PhotonThresholdDetector(modes.indices[1])
-    else
-        return [PhotonThresholdDetector(mode) for mode in modes.indices]
-    end
+
+abstract type Measurement end
+
+struct PhotonNumMeasurement <: Measurement
+    n::Int
 end
+
+struct PhotonThresholdMeasurement <: Measurement
+    present::Bool
+end
+
+struct TraceOut <: Measurement end
+
+struct DetectionOutcome
+    measurements::Vector{Measurement}
+end
+
+function DetectionOutcome(pairs::Pair{ModeRef, <:Any}...)
+    register = first(pairs).first.register
+    measurements = Vector{Measurement}(undef, register.mds)
+    for i in 1:register.mds
+        measurements[i] = TraceOut()
+    end
+    for (mode_ref, outcome) in pairs
+        outcomes = outcome isa AbstractVector ? outcome : [outcome]
+        for (mode, val) in zip(mode_ref.indices, outcomes)
+            detector = register.detectors[mode]
+            @assert !isnothing(detector) "No detector registered on mode $mode"
+            measurements[mode] = _make_measurement(detector, val)
+        end
+    end
+    return DetectionOutcome(measurements)
+end
+
+_make_measurement(::PhotonNumDetector, n::Int)        = PhotonNumMeasurement(n)
+_make_measurement(::PhotonThresholdDetector, n::Int)  = PhotonThresholdMeasurement(n ≥ 1)
 
 end # module

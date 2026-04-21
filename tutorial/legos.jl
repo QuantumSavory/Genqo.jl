@@ -30,8 +30,7 @@ dets = detectors.PhotonNumDetector() << q[3,4,5,6]
 
 # Find performance metrics
 # Analyze just one metric at one point
-success = detectors.DetectionOutcome(dets => [1,1,0,0]) # Example detection outcome for heralding measurement counted as success
-# success = detectors.DetectionOutcome([q[3]=>1, q[4]=>1, q[5]=>0, q[6]=>0]) # Alternative
+success = registers.DetectionOutcome(q[3,4,5,6] => [1,1,0,0]) # Example detection outcome for heralding measurement counted as success
 result = circuits.analyze!(
     circuit,
     metrics.Probability(success),
