@@ -20,8 +20,8 @@ gates.BeamSplitter() | q[3,5]
 gates.BeamSplitter() | q[4,6]
 
 # Incorporate losses
-ηᵗ = 0.8
-ηᵈ = 0.9
+ηᵗ = 1.0
+ηᵈ = 1.0
 gates.LossChannel(ηᵗ) | q[1,2,7,8]
 gates.LossChannel(ηᵈ) | q[3,4,5,6]
 
@@ -30,14 +30,14 @@ dets = detectors.PhotonNumDetector() << q[3,4,5,6]
 
 # Find performance metrics
 # Analyze just one metric at one point
-success = DetectionOutcome(dets => [1,1,0,0]) # Example detection outcome for heralding measurement counted as success
-# success = DetectionOutcome([q[3]=>1, q[4]=>1, q[5]=>0, q[6]=>0]) # Alternative
-result = metrics.analyze(
+success = detectors.DetectionOutcome(dets => [1,1,0,0]) # Example detection outcome for heralding measurement counted as success
+# success = detectors.DetectionOutcome([q[3]=>1, q[4]=>1, q[5]=>0, q[6]=>0]) # Alternative
+result = circuits.analyze!(
     circuit,
     metrics.Probability(success),
 )
 
-print(result.probability)
+print(result)
 
 ## Analyze multiple metrics at one point (faster because certain Wick contractions can be reused across metrics)
 success = DetectionOutcome([ # multiple detection outcomes can also be used, and Genqo sums the probabilities across them

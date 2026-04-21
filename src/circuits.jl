@@ -3,6 +3,7 @@ module circuits
 using ..gates
 using ..registers
 using ..metrics
+using ..metrics: ComputeStep
 using ..detectors
 
 export Circuit, fuse, fuse!, run
@@ -79,17 +80,17 @@ function run!(circuit::Circuit)
     end
 end
 
-function analyze!(circuit::Circuit, metrics::Vector{Metric})::Dict{Metric, Any}
+function analyze!(circuit::Circuit, metrics::Vector{<:Metric})::Dict{<:Metric, Any}
     run!(circuit)
 
     # Compute each metric, caching intermediate results as needed for efficiency
     results = Dict{Metric, Any}()
     cache = Dict{ComputeStep, Any}()
     for metric in metrics
-        results[metric] = compute!(metric, circuit.register.state, cache)
+        results[metric] = compute!(metric, circuit.register, cache)
     end
     return results
 end
-analyze!(circuit::Circuit, metric::Metric) = analyze!(circuit, [metric])
+analyze!(circuit::Circuit, metric::Metric) = analyze!(circuit, [metric])[metric]
 
 end # module
