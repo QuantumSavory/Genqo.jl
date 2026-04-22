@@ -7,7 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-## [1.0.0] - 2026-04-02
+### Changed
+
+- Benchmarking now saves .json files and plots under `.benchmarks/<ISO-timestamp>_<short-commit-hash>/` instead of overwriting `.benchmarks/py-bench.json`, `.benchmarks/jl-bench.json`, and `.benchmarks/benchmark_comparison.svg`.
+
+### Fixed
+
+- `justfile` now updated to reflect Julia workspaces under `docs/` and `test/`.
+
+## [1.1.0] - 2026-04-06
 
 ### Added
 
@@ -16,3 +24,4 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comparison test suite validating Julia against reference Python implementation
 - Benchmark suite for Julia and Python performance comparison
 - CI/CD workflows for testing, releasing, and publishing
+- API documentation

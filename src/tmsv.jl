@@ -6,6 +6,18 @@ using LinearAlgebra
 using ..tools
 
 
+"""
+    TMSV
+
+Parameters for a Two-Mode Squeezed Vacuum (TMSV) entanglement source.
+
+The TMSV is the simplest Gaussian entangled state. Both modes are produced by a
+single parametric interaction, and the entanglement is characterized by the mean photon number μ.
+
+# Fields
+- `mean_photon::Real`         : Mean photon number per mode (default `1e-2`)
+- `detection_efficiency::Real`: Detector efficiency, ∈ [0, 1] (default `1.0`)
+"""
 Base.@kwdef mutable struct TMSV
     mean_photon::Real = 1e-2
     detection_efficiency::Real = 1.0
@@ -48,7 +60,15 @@ covariance_matrix(μ::Real) = [
 covariance_matrix(tmsv::TMSV) = covariance_matrix(tmsv.mean_photon)
 
 """
-Calculates the portion of the A matrix that arrises due to incorporating loss
+    loss_matrix_pgen(ηᵈ::Real)
+
+Construct the loss contribution to the A-matrix for TMSV probability-of-success calculations.
+
+# Parameters
+- ηᵈ: Detection efficiency, ∈ [0, 1]
+
+# Returns
+8×8 `ComplexF64` loss matrix for use in `A = k_function_matrix(cov) + loss_matrix_pgen(ηᵈ)`.
 """
 function loss_matrix_pgen(ηᵈ::Real)
     G = zeros(ComplexF64, 8, 8)
@@ -64,6 +84,20 @@ function loss_matrix_pgen(ηᵈ::Real)
 end
 loss_matrix_pgen(tmsv::TMSV) = loss_matrix_pgen(tmsv.detection_efficiency)
 
+"""
+    moment_vector(n::Int)
+
+Construct the symbolic moment polynomial for order `n` of the TMSV coincidence measurement.
+
+Returns the Nemo polynomial `(α₁α₂)ⁿ/n! · (β₁β₂)ⁿ/n!` in the global phase-space variables,
+representing the n-photon coincidence moment. Evaluated at `n=1` for `probability_success`.
+
+# Parameters
+- n: Photon number order
+
+# Returns
+Nemo multivariate polynomial over `ComplexField`.
+"""
 function moment_vector(n::Int)
     (α[1]*α[2])^n / factorial(n) * (β[1]*β[2])^n / factorial(n)
 end

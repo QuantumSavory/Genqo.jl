@@ -8,6 +8,20 @@ import ..spdc
 using ..tools
 
 
+"""
+    ZALM
+
+Parameters for a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source.
+
+The ZALM architecture uses two SPDC sources, interfering half of the modes from each source on a pair of 50/50 beamsplitters to perform a Bell-state measurement (BSM). A heralding click pattern signifies a probabilistic photon-photon Bell state between the output modes. Dark counts and all three efficiency channels can be modeled.
+
+# Fields
+- `mean_photon::Real`           : Mean photon number per mode per SPDC source (default `1e-2`)
+- `detection_efficiency::Real`  : Signal detector efficiency, ∈ [0, 1] (default `1.0`)
+- `bsm_efficiency::Real`        : BSM detector efficiency, ∈ [0, 1] (default `1.0`)
+- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
+- `dark_counts::Real`           : Dark-count probability per BSM detector gate, ≥ 0 (default `0.0`)
+"""
 Base.@kwdef mutable struct ZALM
     mean_photon::Real = 1e-2
     #schmidt_coeffs::Vector{Float64}
@@ -58,7 +72,15 @@ _S46 = begin
 end
 
 """
-Calculate the covariance matrix of the single-mode ZALM source
+    covariance_matrix(μ::Real)
+
+Construct the 32×32 pre-heralding covariance matrix for a ZALM source.
+
+# Parameters
+- μ: Mean photon number per mode
+
+# Returns
+32×32 `Float64` covariance matrix in qqpp ordering after beamsplitter transforms.
 """
 function covariance_matrix(μ::Real)
     # Initial ZALM covariance matrix in qpqp ordering
@@ -72,7 +94,20 @@ end
 covariance_matrix(zalm::ZALM) = covariance_matrix(zalm.mean_photon)
 
 """
-Calculate the loss portion of the A matrix, specifically when calculating the fidelity.
+    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+
+Construct the 32×32 loss matrix for ZALM fidelity calculations.
+
+Encodes per-mode loss: signal modes (1, 2, 7, 8) use η = ηᵗηᵈ; BSM modes (3–6) use ηᵇ.
+Added to the K-matrix before Wick evaluation of Bell-state overlap terms.
+
+# Parameters
+- ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
+- ηᵈ: Signal detection efficiency, ∈ [0, 1]
+- ηᵇ: BSM detector efficiency, ∈ [0, 1]
+
+# Returns
+32×32 `ComplexF64` loss matrix for fidelity calculations.
 """
 function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
     G = zeros(ComplexF64, 4*mds, 4*mds)
@@ -90,14 +125,19 @@ end
 loss_bsm_matrix_fid(zalm::ZALM) = loss_bsm_matrix_fid(zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency)
 
 """
-Calculate the loss portion of the A matrix, specifically when calculating probability of success
+    loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
 
-TODO/QUESTION:
-Currently, this function projects the signal modes (1, 2, 7, 8) onto the Vacuum state 
-(effectively setting η=0 for those modes). 
-Should we instead be "Tracing out" these modes (effectively setting η=1)? 
-Projecting to vacuum implies we only count success if the BSM clicks AND zero signal photons 
-are generated, which results in a very small probability and potentially inflates the Fidelity calculation.
+Construct the 32×32 loss matrix for ZALM probability-of-success calculations.
+
+Similar to `loss_bsm_matrix_fid`, but the signal modes (1, 2, 7, 8) are traced out. BSM modes (3–6) use ηᵇ.
+
+# Parameters
+- ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
+- ηᵈ: Signal detection efficiency, ∈ [0, 1]
+- ηᵇ: BSM detector efficiency, ∈ [0, 1]
+
+# Returns
+32×32 `ComplexF64` loss matrix for probability-of-success calculations.
 """
 function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
     G = zeros(ComplexF64, 4*mds, 4*mds)
@@ -124,7 +164,7 @@ loss_bsm_matrix_pgen(zalm::ZALM) = loss_bsm_matrix_pgen(zalm.outcoupling_efficie
 """
     dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
 
-Calculate a single element of the unnormalized density matrix.
+Calculate a single element of the unnormalized spin-spin density matrix.
 
 # Parameters
 - dmi : Row number for the corresponding density matrix element
@@ -354,10 +394,7 @@ probability_success(zalm::ZALM) = probability_success(zalm.mean_photon, zalm.out
 
 Calculate the Bell-state fidelity of the single-mode ZALM source under loss.
 
-This computes the overlap ⟨Φ|ρ|Φ⟩ of the post-selected spin-spin state produced by the ZALM source with an
-ideal Bell state. The evaluation is performed via Gaussian moment (Wick) contractions using the ZALM
-covariance matrix, with efficiencies applied through transmission/outcoupling (ηᵗ), detection (ηᵈ), and
-Bell-state-measurement (ηᵇ) models.
+This computes the overlap ⟨Φ|ρ|Φ⟩ of the post-heralding photon-photon state produced by the ZALM source with an ideal Bell state. The evaluation is performed via Gaussian moment (Wick) contractions using the ZALM covariance matrix, with efficiencies applied through transmission/outcoupling (ηᵗ), detection (ηᵈ), and Bell-state-measurement (ηᵇ) models.
 
 # Parameters
 - μ  : Mean photon number

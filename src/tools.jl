@@ -45,6 +45,22 @@ function _wick_partitions(n::Int)
 end
 const wick_partitions = Dict(n => _wick_partitions(n) for n in (0, 2, 4, 6, 8)) # Precompute for n=0,2,4,6,8
 
+"""
+    wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
+
+Evaluate a single monomial term via Wick's theorem (sum over perfect pairings).
+
+For each Wick partition of the indices in `moment_vector`, multiplies the corresponding
+entries of `Ainv` and accumulates the result, then scales by `coef`.
+
+# Parameters
+- coef         : Complex coefficient of the monomial
+- moment_vector: Variable indices appearing in the monomial (length must be even)
+- Ainv         : Inverse A-matrix providing the two-point contractions
+
+# Returns
+`coef` times the sum of all Wick-contraction products for this monomial.
+"""
 function wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
     # Iterate over Wick partitions
     coeff_sum = zero(ComplexF64)
@@ -145,6 +161,20 @@ function W(terms::Vector{Tuple{ComplexF64, Vector{Int}}}, Ainv::Matrix{ComplexF6
     return elm
 end
 
+"""
+    permutation_matrix(permutations::Vector{Int})
+
+Construct a permutation matrix from a permutation vector.
+
+Returns the n×n matrix `P` where `P[i, permutations[i]] = 1` and all other entries are zero.
+Used to reorder rows/columns of a covariance matrix between mode orderings.
+
+# Parameters
+- permutations: Integer vector of length n encoding the permutation (1-indexed)
+
+# Returns
+n×n `Float64` permutation matrix.
+"""
 function permutation_matrix(permutations::Vector{Int})
     n = length(permutations)
     P = zeros(n, n)
@@ -155,7 +185,18 @@ function permutation_matrix(permutations::Vector{Int})
 end
 
 """
-Reorder covariance matrix from qpqp to qqpp ordering
+    reorder(covariance_matrix)
+
+Reorder a covariance matrix from qpqp to qqpp mode ordering.
+
+Applies the permutation `[1, 3, 5, ..., 2, 4, 6, ...]` via a similarity transform so that all
+q-quadratures come before all p-quadratures. Required before calling `k_function_matrix`.
+
+# Parameters
+- covariance_matrix: Real covariance matrix (or `BlockDiagonal`) in qpqp ordering
+
+# Returns
+Reordered covariance matrix in qqpp ordering.
 """
 function reorder(covariance_matrix::Union{Matrix{Float64}, BlockDiagonal{Float64, Matrix{Float64}}})
     sz = size(covariance_matrix)[1]
