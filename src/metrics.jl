@@ -71,7 +71,7 @@ function compute!(probability::Probability, register::QuantumRegister, cache::Di
     C = compute!(CPoly(probability.detection_outcome), register, cache)
     Γ = register.state.covariance + 0.5*I
     detΓ = det(Γ)
-    return (det(Ainv) / (detΓ^0.25 * conj(detΓ)^0.25)) * W(C, Ainv)
+    return (sqrt(det(Ainv)) / (detΓ^0.25 * conj(detΓ)^0.25)) * W(C, Ainv)
 end
 
 # Compute fidelity of post-selected state with respect to ideal target state
