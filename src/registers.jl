@@ -7,7 +7,7 @@ using ..states
 using ..gates
 using ..detectors
 
-export CircuitBuilder, QuantumRegister, ModeRef, DetectionOutcome
+export CircuitBuilder, QuantumRegister, ModeRef, MeasurementOutcome
 export PhotonNumMeasurement, PhotonThresholdMeasurement, TraceOut
 
 
@@ -114,11 +114,11 @@ end
 
 struct TraceOut <: Measurement end
 
-struct DetectionOutcome
+struct MeasurementOutcome
     measurements::Vector{Measurement}
 end
 
-function DetectionOutcome(pairs::Pair{ModeRef, <:Any}...)
+function MeasurementOutcome(pairs::Pair{ModeRef, <:Any}...)
     register = first(pairs).first.register
     measurements = Vector{Measurement}(undef, register.mds)
     for i in 1:register.mds
@@ -132,7 +132,7 @@ function DetectionOutcome(pairs::Pair{ModeRef, <:Any}...)
             measurements[mode] = _make_measurement(detector, val)
         end
     end
-    return DetectionOutcome(measurements)
+    return MeasurementOutcome(measurements)
 end
 
 _make_measurement(::PhotonNumDetector, n::Int)        = PhotonNumMeasurement(n)

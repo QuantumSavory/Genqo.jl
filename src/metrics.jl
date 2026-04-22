@@ -31,7 +31,7 @@ end
 
 # The C polynomial depends on the specific detection outcome.
 struct CPoly <: ComputeStep
-    detection_outcome::DetectionOutcome
+    detection_outcome::MeasurementOutcome
 end
 function compute!(cpoly::CPoly, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Vector{Tuple{ComplexF64, Vector{Int}}}
     get!(cache, cpoly) do
@@ -63,7 +63,7 @@ abstract type Metric end
 
 # Compute probability of a given detection outcome
 struct Probability <: Metric
-    detection_outcome::DetectionOutcome
+    detection_outcome::MeasurementOutcome
 end
 function compute!(probability::Probability, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Float64
     # Compute the probability of the given detection outcome by building the appropriate moment polynomial and performing the necessary Wick contractions
@@ -77,7 +77,7 @@ end
 # Compute fidelity of post-selected state with respect to ideal target state
 struct Fidelity <: Metric
     ideal_state::QuantumState
-    detection_outcome::Vector{DetectionOutcome}
+    detection_outcome::Vector{MeasurementOutcome}
 end
 function compute!(fidelity::Fidelity, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Float64
     # Compute the fidelity of the post-selected state with respect to the ideal target state by computing the density matrix of the post-selected state and then computing the appropriate overlap with the ideal state

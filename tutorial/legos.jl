@@ -30,16 +30,24 @@ dets = detectors.PhotonNumDetector() << q[3,4,5,6]
 
 # Find performance metrics
 # Analyze just one metric at one point
-success = registers.DetectionOutcome(q[3,4,5,6] => [1,1,0,0]) # Example detection outcome for heralding measurement counted as success
+success = registers.MeasurementOutcome(q[3,4,5,6] => [1,1,0,0]) # Example measurement outcome for heralding measurement counted as success
 result = circuits.analyze!(
     circuit,
     metrics.Probability(success),
 )
 
+# outcome = registers.MeasurementOutcome(q[3,4,5,6] => [1,1,0,0]) # Example measurement outcome for heralding measurement counted as success
+# result = metrics.probability(circuit, outcome)
+
+# cache_per_point(circuit) do cache
+#     Pg = metrics.probability(circuit, outcome; cache)
+#     F = metrics.fidelity(circuit, ξ, outcome; cache)
+# end
+
 print(result)
 
 ## Analyze multiple metrics at one point (faster because certain Wick contractions can be reused across metrics)
-success = DetectionOutcome([ # multiple detection outcomes can also be used, and Genqo sums the probabilities across them
+success = registers.MeasurementOutcome([ # multiple measurement outcomes can also be used, and Genqo sums the probabilities across them
     dets => [1,1,0,0],
     dets => [0,0,1,1],
     dets => [0,1,1,0],
@@ -88,7 +96,7 @@ gates.LossChannel(ηᵗ) | q[1,2,7,8]
 
 results = circuits.analyze(
     circuit,
-    DetectionOutcome([q[3,4]=>1, q[5,6]=>0]), # Example detection outcome for heralding measurement
+    MeasurementOutcome([q[3,4]=>1, q[5,6]=>0]), # Example measurement outcome for heralding measurement
     metrics.ProbabilitySuccess(),
     :μ => logrange(0.01, 10.0, 100), # Sweep mean photon number from 0.01 to 10 across 100 points
 )

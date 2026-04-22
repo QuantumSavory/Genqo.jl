@@ -3,7 +3,6 @@ module detectors
 using LinearAlgebra
 
 export Detector, PhotonNumDetector, PhotonThresholdDetector
-export DetectionOutcome, PhotonNumOutcome, PhotonThresholdOutcome
 export G_matrix
 
 
