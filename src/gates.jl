@@ -90,18 +90,23 @@ function expand(ch::LossChannel, indices::Vector{Int}, mds::Int)::LossChannel
 end
 
 function apply!(ch::LossChannel, st::GaussianState)
-    # Loss Channel applies as γ ↦ ηγ + (1-η)I/2, where γ is a 2x2 submatrix of the covariance matrix V representing just one mode.
-    # Here, η is a vector meant to apply to every mode.
-    # TODO: derive this formula by applying beamsplitter w/ vacuum and tracing out vacuum
-    η = ch.η
+    η = ch.η                # vector of per-mode transmissivities
     V = st.covariance
     mds = length(η)
+    
+    # Build the scaling vector: √ηᵢ for q and p of each mode
+    d = vcat(sqrt.(η), sqrt.(η))   # length 2*mds, matches qqpp ordering
+    
+    # Apply V' = D V Dᵀ with D = diag(d)
+    # This scales entire rows and columns, including off-diagonals
+    V .= (d .* V) .* d'
+    
+    # Add the noise on the self-variance of each attenuated mode
     for i in 1:mds
-        if η[i] == 1 continue end
-        idx = [i, i+mds]
-        V[idx, idx] .*= η[i]
-        V[idx, idx] .+= (1-η[i])*I(2)/2
+        V[i,     i    ] += (1 - η[i]) / 2    # q-q noise
+        V[i+mds, i+mds] += (1 - η[i]) / 2    # p-p noise
     end
+    return st
 end
 
 function LossChannel(η::Real...)
