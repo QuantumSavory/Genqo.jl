@@ -46,54 +46,6 @@ result = circuits.analyze!(
 
 print(result)
 
-## Make plots of loss
-using Genqo
-using Plots
-
-function probability(ηᵈ)
-    circuit = circuits.Circuit(8)
-    q = circuit.register
-
-    # Initialize TMSV states
-    μ = 0.2
-    states.TMSVState(μ) >> q[1,2]
-    states.TMSVState(μ) >> q[3,4]
-    states.TMSVState(μ) >> q[5,6]
-    states.TMSVState(μ) >> q[7,8]
-
-    # Apply mode swaps
-    gates.ModeSwap() | q[2,4]
-    gates.ModeSwap() | q[5,7]
-
-    # Apply beamsplitters
-    gates.BeamSplitter() | q[3,5]
-    gates.BeamSplitter() | q[4,6]
-
-    # Incorporate losses
-    ηᵗ = 1.0
-    gates.LossChannel(ηᵗ) | q[1,2,7,8]
-    gates.LossChannel(ηᵈ) | q[3,4,5,6]
-
-    # Heralding detection
-    detectors.PhotonNumDetector() << q[3,4,5,6]
-
-    # Find performance metrics
-    # Analyze just one metric at one point
-    success = registers.MeasurementOutcome(q[3,4,5,6] => [1,1,0,0]) # Example measurement outcome for heralding measurement counted as success
-    return circuits.analyze!(
-        circuit,
-        metrics.Probability(success),
-    )
-end
-
-η = 0.01:0.01:1.0
-
-Pg_ground = zalm.probability_success.(0.2, 1, 1, η, 0)
-Pg_new = probability.(η)
-
-plot(η, Pg_ground, label="Ground truth", yscale=:log10, xlabel="BSM efficiency", ylabel="Probability of Success", legend=:bottomright)
-plot!(η, Pg_new, label="ZALM model in new Genqo", linestyle=:dash)
-
 ## Analyze multiple metrics at one point (faster because certain Wick contractions can be reused across metrics)
 success = registers.MeasurementOutcome([ # multiple measurement outcomes can also be used, and Genqo sums the probabilities across them
     dets => [1,1,0,0],
