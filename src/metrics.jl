@@ -1,6 +1,3 @@
-"""
-metrics.jl: This module contains functions for computing performance metrics such as probability of success and fidelity for quantum circuits.
-"""
 module metrics
 
 using LinearAlgebra
