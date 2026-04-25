@@ -3716,12 +3716,13 @@ class SIGSAG_BS:
         self.calculate_k_function_matrix()
 
         nA1 = self.results["k_function_matrix"] + self.results["loss_bsm_matrix"]
+        nA1inv = np.linalg.inv(nA1)
         Gam = self.results["Gamma"]
 
-        F1 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn1, nA1, x)
-        F2 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn2, nA1, x)
-        F3 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn3, nA1, x)
-        F4 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn4, nA1, x)
+        F1 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn1, nA1inv, x)
+        F2 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn2, nA1inv, x)
+        F3 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn3, nA1inv, x)
+        F4 = SIGSAG_BS.dmatval_do_not_store_looping_pattern(Cn4, nA1inv, x)
 
         D1 = np.sqrt(np.linalg.det(nA1))
         D2 = (np.linalg.det(Gam))**(0.25)
