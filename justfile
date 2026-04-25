@@ -11,9 +11,14 @@ install:
 
 # Run tests comparing Julia and Python genqo implementations
 test:
-    @echo "Running tests comparing Julia and Python genqo..."
-    . python/.venv/bin/activate && \
-    pytest test/python/test_compare_with_python.py
+    #!/usr/bin/env bash
+    set -e
+    echo "Running tests comparing Julia and Python genqo..."
+    BENCH_DIR=".benchmarks/$(date -u +%Y-%m-%dT%H:%M:%S)_$(git rev-parse --short HEAD)"
+    mkdir -p "$BENCH_DIR"
+    . python/.venv/bin/activate
+    pytest test/python/test_compare_with_python.py --bench-dir="$BENCH_DIR"
+    python test/python/precision_table.py "$BENCH_DIR"
 
 # Run benchmarks for <func>, e.g. just bench spdc.spin_density_matrix (benchmarks all by default)
 bench func="":

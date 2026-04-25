@@ -6,6 +6,10 @@ import numpy as np
 
 tol = 1e-8
 
+def _mat_to_json(mat: np.ndarray) -> dict:
+    arr = np.asarray(mat, dtype=np.complex128)
+    return {"real": np.real(arr).tolist(), "imag": np.imag(arr).tolist()}
+
 error_with_params = lambda params: f"Python-Julia comparison yielded results that do not agree for parameters:\n{'\n'.join([f'{k}={v}' for k, v in params.items()])}"
 
 # TMSV tests
@@ -29,7 +33,7 @@ def test_tmsv__loss_matrix_pgen(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_tes
 
         assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
-def test_tmsv__probability_success(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_test_cases: list[dict]) -> None:
+def test_tmsv__probability_success(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_test_cases: list[dict], precision_table: list) -> None:
     for params in tmsv_test_cases:
         tmsv_py.params.update(params)
         tmsv_py.run()
@@ -40,6 +44,12 @@ def test_tmsv__probability_success(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_
         prob_success_jl = tmsv_jl.probability_success()
 
         assert np.isclose(prob_success_py, prob_success_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "tmsv.probability_success",
+            "params": params,
+            "py": float(prob_success_py),
+            "jl": float(prob_success_jl),
+        })
 
 
 # SPDC tests
@@ -64,7 +74,7 @@ def test_spdc__loss_bsm_matrix_fid(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_
 
         assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
-def test_spdc__spin_density_matrix(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict]) -> None:
+def test_spdc__spin_density_matrix(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict], precision_table: list) -> None:
     nvec = np.array([0,1,0,1])
     for params in spdc_test_cases:
         spdc_py.params.update(params)
@@ -75,8 +85,14 @@ def test_spdc__spin_density_matrix(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_
         spdc_jl.set(**params)
         spin_density_matrix_jl = spdc_jl.spin_density_matrix(nvec)
         assert np.allclose(spin_density_matrix_py, spin_density_matrix_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "spdc.spin_density_matrix",
+            "params": params,
+            "py": _mat_to_json(spin_density_matrix_py),
+            "jl": _mat_to_json(np.array(spin_density_matrix_jl)),
+        })
 
-def test_spdc__fidelity(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict]) -> None:
+def test_spdc__fidelity(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict], precision_table: list) -> None:
     for params in spdc_test_cases:
         spdc_py.params.update(params)
         spdc_py.run()
@@ -87,6 +103,12 @@ def test_spdc__fidelity(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases:
         fidelity_jl = spdc_jl.fidelity()
 
         assert np.isclose(fidelity_py, fidelity_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "spdc.fidelity",
+            "params": params,
+            "py": float(fidelity_py),
+            "jl": float(fidelity_jl),
+        })
 
 
 # ZALM tests
@@ -124,7 +146,7 @@ def test_zalm__loss_bsm_matrix_pgen(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm
 
         assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
-def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
+def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict], precision_table: list) -> None:
     nvec = np.array([1,0,1,1,0,0,1,0])
     for params in zalm_test_cases:
         zalm_py.params.update(params)
@@ -135,8 +157,14 @@ def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_
         zalm_jl.set(**params)
         spin_density_matrix_jl = zalm_jl.spin_density_matrix(nvec)
         assert np.allclose(spin_density_matrix_py, spin_density_matrix_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "zalm.spin_density_matrix",
+            "params": params,
+            "py": _mat_to_json(spin_density_matrix_py),
+            "jl": _mat_to_json(np.array(spin_density_matrix_jl)),
+        })
 
-def test_zalm__probability_success(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
+def test_zalm__probability_success(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict], precision_table: list) -> None:
     for params in zalm_test_cases:
         zalm_py.params.update(params)
         zalm_py.run()
@@ -147,8 +175,14 @@ def test_zalm__probability_success(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_
         prob_success_jl = zalm_jl.probability_success()
 
         assert np.isclose(prob_success_py, prob_success_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "zalm.probability_success",
+            "params": params,
+            "py": float(prob_success_py),
+            "jl": float(prob_success_jl),
+        })
 
-def test_zalm__fidelity(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
+def test_zalm__fidelity(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict], precision_table: list) -> None:
     for params in zalm_test_cases:
         zalm_py.params.update(params)
         zalm_py.run()
@@ -159,6 +193,12 @@ def test_zalm__fidelity(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases:
         fidelity_jl = zalm_jl.fidelity()
 
         assert np.isclose(fidelity_py, fidelity_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "zalm.fidelity",
+            "params": params,
+            "py": float(fidelity_py),
+            "jl": float(fidelity_jl),
+        })
 
 
 # SIGSAG tests
@@ -185,7 +225,7 @@ def test_sigsag__loss_bsm_matrix_fid(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.
 
         assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
-def test_sigsag__probability_success(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict]) -> None:
+def test_sigsag__probability_success(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict], precision_table: list) -> None:
     for params in sigsag_test_cases:
         sigsag_py.params.update(params)
         sigsag_py.run()
@@ -196,8 +236,14 @@ def test_sigsag__probability_success(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.
         prob_success_jl = sigsag_jl.probability_success()
 
         assert np.isclose(prob_success_py, prob_success_jl, atol=tol), error_with_params(params)
+        precision_table.append({
+            "function": "sigsag.probability_success",
+            "params": params,
+            "py": float(prob_success_py),
+            "jl": float(prob_success_jl),
+        })
 
-def test_sigsag__fidelity(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict]) -> None:
+def test_sigsag__fidelity(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict], precision_table: list) -> None:
     for params in sigsag_test_cases:
         sigsag_py.params.update(params)
         sigsag_py.run()
@@ -209,6 +255,12 @@ def test_sigsag__fidelity(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sig
 
         # Relax tolerance here because tests were failing due to a small numerical difference, even when implementation is correct
         assert np.isclose(fidelity_py, fidelity_jl, atol=1e-2), error_with_params(params)
+        precision_table.append({
+            "function": "sigsag.fidelity",
+            "params": params,
+            "py": float(fidelity_py),
+            "jl": float(fidelity_jl),
+        })
 
 
 # Other tests
