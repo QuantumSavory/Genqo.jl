@@ -58,7 +58,7 @@ _S35 = begin
         -1/sqrt(2)  0  1/sqrt(2)  0;
         0           0  0          1;
     ]
-    Matrix(BlockDiagonal([Id2, St35, Id2, Id2, St35, Id2]))
+    BlockDiagonal([Id2, St35, Id2, Id2, St35, Id2])
 end
 _S46 = begin
     Id2 = Matrix{Float64}(I, 2, 2)
@@ -68,9 +68,12 @@ _S46 = begin
         0  0           1  0;
         0  -1/sqrt(2)  0  1/sqrt(2);
     ]
-    Matrix(BlockDiagonal([Id2, St46, Id2, Id2, St46, Id2]))
+    BlockDiagonal([Id2, St46, Id2, Id2, St46, Id2])
 end
 
+# Precompute constant matrix products
+const _S35_S46_PRODUCT = Matrix(_S46 * _S35)
+const _S35_ADJOINT_S46_ADJOINT = Matrix(_S35' * _S46')
 """
     covariance_matrix(μ::Real)
 
@@ -89,7 +92,7 @@ function covariance_matrix(μ::Real)
 
     # Reorder qpqp → qqpp and apply beamsplitters
     covar_qqpp = reorder(covar_qpqp) 
-    return _S46 * _S35 * covar_qqpp * _S35' * _S46'
+    return _S35_S46_PRODUCT * covar_qqpp * _S35_ADJOINT_S46_ADJOINT
 end
 covariance_matrix(zalm::ZALM) = covariance_matrix(zalm.mean_photon)
 
