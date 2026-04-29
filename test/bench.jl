@@ -69,6 +69,52 @@ suite["sigsag.probability_success"]    = @benchmarkable sigsag.probability_succe
 suite["sigsag.fidelity"]               = @benchmarkable sigsag.fidelity(s)                    setup=(s=rand_sigsag())
 
 
+# Perfect Matching Permutation (PMP) algorithm benchmarks (old vs new)
+# The old algorithm (ported from genqo_old_pip.py:33-41) generates every n/2-sized
+# combination of index pairs and rejects those that don't cover all indices exactly
+# once. The new algorithm (tools._wick_partitions) builds pairings recursively, only
+# emitting valid perfect matchings.
+function _wick_partitions_old(n::Int)
+    @assert iseven(n) "n must be even"
+    all_partitions = Vector{Vector{Tuple{Int,Int}}}()
+
+    # Mimic itertools.combinations(range(n), 2)
+    pairs = Tuple{Int,Int}[]
+    for i in 1:n-1, j in i+1:n
+        push!(pairs, (i, j))
+    end
+    npairs = length(pairs)
+    target = n ÷ 2
+
+    # Mimic itertools.combinations(pairs, n//2), filtering for full coverage
+    function inner(start::Int, current::Vector{Tuple{Int,Int}})
+        if length(current) == target
+            flat = Set{Int}()
+            for (i, j) in current
+                push!(flat, i); push!(flat, j)
+            end
+            if length(flat) == n
+                push!(all_partitions, copy(current))
+            end
+            return
+        end
+        # Need at least (target - length(current)) more pairs
+        for k in start:(npairs - (target - length(current)) + 1)
+            push!(current, pairs[k])
+            inner(k + 1, current)
+            pop!(current)
+        end
+    end
+    inner(1, Tuple{Int,Int}[])
+    return all_partitions
+end
+
+for N in (2, 4, 6, 8)
+    suite["pmp.new.N=$N"] = @benchmarkable tools._wick_partitions($N)
+    suite["pmp.old.N=$N"] = @benchmarkable _wick_partitions_old($N)
+end
+
+
 # Other benchmarks
 suite["tools.k_function_matrix"]     = @benchmarkable tools.k_function_matrix(cov) setup=(cov=zalm.covariance_matrix(rand_zalm()))
 suite["linsweep_1d"]                 = @benchmarkable tmsv.probability_success.(range(1e-4, stop=1e-2, length=100), 0.7)
