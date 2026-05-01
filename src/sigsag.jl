@@ -186,37 +186,35 @@ function _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})::Nemo.Generic.MPol
 end
 
 """
-    moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}}
+    moment_vector::NamedTuple
 
-Symbolic moment polynomials used by SIGSAG. Each polynomial is the η-stripped part of a
-specific Gaussian moment; the full physical moment recovers a `ηᵈ²·ηᵗ^k` prefactor at call time.
+Symbolic moment polynomials used by SIGSAG, as a `NamedTuple`. Each polynomial is the η-stripped
+part of a specific Gaussian moment; the full physical moment recovers a `ηᵈ²·ηᵗ^k` prefactor at
+call time.
 
-Keys:
-- `0` — `α[1]α[2]·β[1]β[2]` — used by `probability_success` (prefactor `ηᵈ²`)
-- `1`–`4` — Bell-state overlap moments for the four `(n1, n2)` patterns used by `fidelity`
-  (prefactor `ηᵈ²·ηᵗ²`)
+Fields:
+- `pgen` — `α[1]α[2]·β[1]β[2]`, used by `probability_success` (prefactor `ηᵈ²`)
+- `bell_aa`, `bell_bb`, `bell_ab`, `bell_ba` — Bell-state overlap moments for the four
+  `(n1, n2)` patterns used by `fidelity` (prefactor `ηᵈ²·ηᵗ²`)
 """
-const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = Dict(
-    0 => _moment_vector_sym([0,0,0,0], [0,0,0,0]),
-    1 => _moment_vector_sym([1,0,0,1], [1,0,0,1]),
-    2 => _moment_vector_sym([0,1,1,0], [0,1,1,0]),
-    3 => _moment_vector_sym([1,0,0,1], [0,1,1,0]),
-    4 => _moment_vector_sym([0,1,1,0], [1,0,0,1]),
+const moment_vector = (
+    pgen    = _moment_vector_sym([0,0,0,0], [0,0,0,0]),
+    bell_aa = _moment_vector_sym([1,0,0,1], [1,0,0,1]),
+    bell_bb = _moment_vector_sym([0,1,1,0], [0,1,1,0]),
+    bell_ab = _moment_vector_sym([1,0,0,1], [0,1,1,0]),
+    bell_ba = _moment_vector_sym([0,1,1,0], [1,0,0,1]),
 )
 
 """
-    moment_terms::Dict{Int, tools.WTerms}
+    moment_terms::NamedTuple
 
-Precompiled Wick terms for SIGSAG moment polynomials.
+Precompiled Wick terms for SIGSAG moment polynomials, mirroring the field names of `moment_vector`.
 
-- Keys match `moment_vector`.
-- Values are `tools.WTerms` objects bundling per-degree monomial buckets — see `tools.WBucket`.
-- Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
-- Exists to avoid repeated Nemo polynomial parsing during fidelity and probability_success.
+Each field is a concrete `tools.WTerms{<:Tuple}` whose type is fixed at module load — so call
+sites like `tools.W(moment_terms.bell_aa, Ainv)` resolve to a fully type-stable specialized
+method, with no runtime dispatch.
 """
-const moment_terms::Dict{Int, tools.WTerms} = Dict(
-    k => extract_W_terms(v) for (k, v) in moment_vector
-)
+const moment_terms = map(extract_W_terms, moment_vector)
 
 
 """
@@ -244,8 +242,8 @@ function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
     D3 = conj(detΓ)^(1/4)
     Coef = 1/(D1*D2*D3)
 
-    # Full moment is ηᵈ² · α[1]α[2]·β[1]β[2]; symbolic part cached as moment_terms[0].
-    return real(Coef * ηᵈ^2 * W(moment_terms[0], Ainv))
+    # Full moment is ηᵈ² · α[1]α[2]·β[1]β[2]; symbolic part cached as moment_terms.pgen.
+    return real(Coef * ηᵈ^2 * W(moment_terms.pgen, Ainv))
 end
 probability_success(sigsag::SIGSAG) = probability_success(sigsag.mean_photon, sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
@@ -272,12 +270,12 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
     detΓ = det(Γ)
 
     # Wick terms (cached). Each fidelity moment carries a numeric prefactor ηᵈ²·ηᵗ²
-    # (sum(n1)+sum(n2) = 4 ⇒ ηᵗ^(4/2) = ηᵗ²); the symbolic part is moment_terms[1..4].
+    # (sum(n1)+sum(n2) = 4 ⇒ ηᵗ^(4/2) = ηᵗ²); the symbolic parts are the four `bell_*` moments.
     Fsum =
-        W(moment_terms[1], Ainv) +
-        W(moment_terms[2], Ainv) +
-        W(moment_terms[3], Ainv) +
-        W(moment_terms[4], Ainv)
+        W(moment_terms.bell_aa, Ainv) +
+        W(moment_terms.bell_bb, Ainv) +
+        W(moment_terms.bell_ab, Ainv) +
+        W(moment_terms.bell_ba, Ainv)
 
     D1 = sqrt(det(A))
     D2 = detΓ^(1/4)

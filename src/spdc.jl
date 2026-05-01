@@ -235,45 +235,45 @@ end
 spin_density_matrix(spdc::SPDC, nvec::Vector{Int}) = spin_density_matrix(spdc.mean_photon, spdc.outcoupling_efficiency, spdc.detection_efficiency, nvec)
 
 """
-    moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}}
+    moment_vector::NamedTuple
 
-Symbolic moment polynomials used by SPDC.
+Symbolic moment polynomials used by SPDC, as a `NamedTuple` of Nemo polynomials in the global
+phase-space variables (`q/p` → α, β). Each entry is a specific Gaussian moment needed in SPDC
+calculations.
 
-- Maps an integer key to a Nemo polynomial in the global phase-space variables (`q/p` → α, β).
-- Each polynomial represents a specific Gaussian moment needed in SPDC calculations
-  (e.g., Bell-overlap terms and normalization/trace-related terms).
-- These are evaluated numerically by contracting against `Ainv` via Wick’s theorem:
-  - either directly with `tools.W(moment_vector[k], Ainv)`, or
-  - more efficiently via `moment_terms[k] = tools.extract_W_terms(moment_vector[k])`.
+Fields:
+- `bell_aa`, `bell_ab`, `bell_ba`, `bell_bb` — fidelity Bell-overlap moments
+- `trc` — trace moment (`α[3]α[4]β[3]β[4]`)
+
+These are evaluated numerically by contracting against `Ainv` via Wick's theorem, either directly
+with `tools.W(moment_vector.<name>, Ainv)` (slow path) or, more efficiently, through the
+precompiled `moment_terms.<name>` cache.
 """
-const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = begin
+const moment_vector = let
     Ca1 = α[1] * α[4]
     Ca2 = α[2] * α[3]
     Cb1 = β[1] * β[4]
     Cb2 = β[2] * β[3]
 
-    Dict(
-        0 => α[3] * α[4] * β[3] * β[4], 
-        1 => Ca1 * Cb1,
-        2 => Ca1 * Cb2,
-        3 => Ca2 * Cb1,
-        4 => Ca2 * Cb2,
+    (
+        bell_aa = Ca1 * Cb1,
+        bell_ab = Ca1 * Cb2,
+        bell_ba = Ca2 * Cb1,
+        bell_bb = Ca2 * Cb2,
+        trc     = α[3] * α[4] * β[3] * β[4],
     )
 end
 
 """
-    moment_terms::Dict{Int, tools.WTerms}
+    moment_terms::NamedTuple
 
-Precompiled Wick terms for SPDC moment polynomials.
+Precompiled Wick terms for SPDC moment polynomials, mirroring the field names of `moment_vector`.
 
-- Keys match `moment_vector` (each key corresponds to a specific moment polynomial used in SPDC formulas).
-- Values are `tools.WTerms` objects bundling per-degree monomial buckets — see `tools.WBucket`.
-- Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
-- Exists to avoid repeated Nemo polynomial parsing during fidelity calculation.
+Each field is a concrete `tools.WTerms{<:Tuple}` whose type is fixed at module load — so call
+sites like `tools.W(moment_terms.bell_aa, Ainv)` resolve to a fully type-stable specialized
+method, with no runtime dispatch.
 """
-const moment_terms::Dict{Int, tools.WTerms} = Dict(
-    k => extract_W_terms(v) for (k, v) in moment_vector
-)
+const moment_terms = map(extract_W_terms, moment_vector)
 
 """
     fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
@@ -308,10 +308,10 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
 
     # Wick terms (cached)
     Fsum =
-        W(moment_terms[1], Ainv1) +
-        W(moment_terms[2], Ainv1) +
-        W(moment_terms[3], Ainv1) +
-        W(moment_terms[4], Ainv1)
+        W(moment_terms.bell_aa, Ainv1) +
+        W(moment_terms.bell_ab, Ainv1) +
+        W(moment_terms.bell_ba, Ainv1) +
+        W(moment_terms.bell_bb, Ainv1)
 
     N1 = (ηᵗ * ηᵈ)^4
 

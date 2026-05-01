@@ -290,18 +290,25 @@ end
 spin_density_matrix(zalm::ZALM, nvec::Vector{Int}) = spin_density_matrix(zalm.mean_photon, zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency, nvec)
 
 """
-    moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}}
+    moment_vector::NamedTuple
 
-Symbolic moment polynomials used by ZALM.
+Symbolic moment polynomials used by ZALM, as a `NamedTuple` of Nemo polynomials in the global
+phase-space variables (`q/p` → α, β). Each entry is a specific Gaussian moment needed in ZALM
+calculations: Bell-overlap, normalization, trace, and click/dark-count terms.
 
-- Maps an integer key to a Nemo polynomial in the global phase-space variables (`q/p` → α, β).
-- Each polynomial represents a specific Gaussian moment needed in ZALM calculations
-  (e.g., Bell-overlap terms, trace/normalization terms, and click/dark-count moments).
-- These are evaluated numerically by contracting against `Ainv` via Wick’s theorem:
-  - either directly with `tools.W(moment_vector[k], Ainv)`, or
-  - more efficiently via `moment_terms[k] = tools.extract_W_terms(moment_vector[k])`.
+Fields:
+- `bell_aa`, `bell_ab`, `bell_ba`, `bell_bb` — fidelity Bell-overlap moments
+- `norm_aa`, `norm_ab`, `norm_ba`, `norm_bb` — normalization moments
+- `trc` — trace moment used by both `fidelity` and `probability_success`
+- `click_a`, `click_b` — single-detector click moments (dark-count contributions)
+- `pair_a` — paired α[1]²β[1]² moment
+- `vac` — vacuum (constant 1) moment
+
+These are evaluated numerically by contracting against `Ainv` via Wick's theorem, either directly
+with `tools.W(moment_vector.<name>, Ainv)` (slow path) or, more efficiently, through the
+precompiled `moment_terms.<name>` cache.
 """
-const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = begin
+const moment_vector = let
     Ca₁ = α[1]*α[3]*α[4]*α[8]
     Ca₂ = α[2]*α[3]*α[4]*α[7]
     Cb₁ = β[1]*β[3]*β[4]*β[8]
@@ -313,37 +320,33 @@ const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = begi
     Cb₃ = β[1]*β[3]*β[4]*β[7]
     Cb₄ = β[2]*β[3]*β[4]*β[8]
 
-    Dict(
-        0 => α[3]*α[4]*β[3]*β[4],
-        1 => Ca₁*Cb₁,
-        2 => Ca₁*Cb₂,
-        3 => Ca₂*Cb₁,
-        4 => Ca₂*Cb₂,
-        5 => Ca₃*Cb₃,
-        6 => Ca₃*Cb₄,
-        7 => Ca₄*Cb₃,
-        8 => Ca₄*Cb₄,
-        9 => α[3]*β[3],
-        10 => α[4]*β[4],
-        11 => α[3]*α[4]*β[3]*β[4],
-        12 => α[1]*α[1]*β[1]*β[1],
-        14 => one(R)
+    (
+        bell_aa = Ca₁*Cb₁,
+        bell_ab = Ca₁*Cb₂,
+        bell_ba = Ca₂*Cb₁,
+        bell_bb = Ca₂*Cb₂,
+        norm_aa = Ca₃*Cb₃,
+        norm_ab = Ca₃*Cb₄,
+        norm_ba = Ca₄*Cb₃,
+        norm_bb = Ca₄*Cb₄,
+        trc     = α[3]*α[4]*β[3]*β[4],
+        click_a = α[3]*β[3],
+        click_b = α[4]*β[4],
+        pair_a  = α[1]*α[1]*β[1]*β[1],
+        vac     = one(R),
     )
 end
 
 """
-    moment_terms::Dict{Int, tools.WTerms}
+    moment_terms::NamedTuple
 
-Precompiled Wick terms for ZALM moment polynomials.
+Precompiled Wick terms for ZALM moment polynomials, mirroring the field names of `moment_vector`.
 
-- Keys match `moment_vector` (each key corresponds to a specific moment polynomial used in ZALM formulas).
-- Values are `tools.WTerms` objects bundling per-degree monomial buckets — see `tools.WBucket`.
-- Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
-- Exists to avoid repeated Nemo polynomial parsing during fidelity and probability_success.
+Each field is a concrete `tools.WTerms{<:Tuple}` whose type is fixed at module load — so call
+sites like `tools.W(moment_terms.bell_aa, Ainv)` resolve to a fully type-stable specialized
+method, with no runtime dispatch.
 """
-const moment_terms::Dict{Int, tools.WTerms} = Dict(
-    k => extract_W_terms(v) for (k, v) in moment_vector
-)
+const moment_terms = map(extract_W_terms, moment_vector)
 
 """
     probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, dark_counts::Real)
@@ -372,17 +375,11 @@ function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, da
     D3 = conj(detΓ)^(1/4)
     Coef = 1/(D1*D2*D3)
 
-    # TODO: should this indexing be changed to 1-based? Or is there some mathematical meaning to the 0 index?
-    C1 = moment_terms[0]
-    C2 = moment_terms[9]
-    C3 = moment_terms[10]
-    C4 = moment_terms[14]
-
     return real(Coef * (
-        ηᵇ^2 * (1-dark_counts)^4 * W(C1, Ainv) +
-        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C2, Ainv) +
-        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C3, Ainv) +
-        dark_counts^2 * (1-dark_counts)^2 * W(C4, Ainv)
+        ηᵇ^2 * (1-dark_counts)^4 * W(moment_terms.trc, Ainv) +
+        ηᵇ * dark_counts * (1-dark_counts)^3 * W(moment_terms.click_a, Ainv) +
+        ηᵇ * dark_counts * (1-dark_counts)^3 * W(moment_terms.click_b, Ainv) +
+        dark_counts^2 * (1-dark_counts)^2 * W(moment_terms.vac, Ainv)
     ))
 end
 probability_success(zalm::ZALM) = probability_success(zalm.mean_photon, zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency, zalm.dark_counts)
@@ -419,18 +416,18 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)::Real
 
     # Wick terms (cached)
     Fsum =
-        W(moment_terms[1], Ainv1) +
-        W(moment_terms[2], Ainv1) +
-        W(moment_terms[3], Ainv1) +
-        W(moment_terms[4], Ainv1)
+        W(moment_terms.bell_aa, Ainv1) +
+        W(moment_terms.bell_ab, Ainv1) +
+        W(moment_terms.bell_ba, Ainv1) +
+        W(moment_terms.bell_bb, Ainv1)
 
     # --- A2 (trace / generation normalization loss) ---
     A2 = K + loss_bsm_matrix_pgen(ηᵗ, ηᵈ, ηᵇ)
     factoredA2 = lu(A2) # factorizes for reuse
     Ainv2 = inv(factoredA2)
     N2 = sqrt(det(factoredA2)) # reuses factorization
-    
-    Trc = W(moment_terms[0], Ainv2)  # <-- cached + defined
+
+    Trc = W(moment_terms.trc, Ainv2)
 
     N1 = (ηᵈ * ηᵗ) ^ 2
     coef = N1 * N2 / (2 * D1)
