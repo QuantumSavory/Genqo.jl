@@ -82,7 +82,7 @@ Construct the 32×32 pre-heralding covariance matrix for a ZALM source.
 # Returns
 32×32 `Float64` covariance matrix in qqpp ordering after beamsplitter transforms.
 """
-function covariance_matrix(μ::Real)
+function covariance_matrix(μ::Real)::Matrix{Float64}
     # Initial ZALM covariance matrix in qpqp ordering
     spdc_covar = spdc.covariance_matrix(μ)
     covar_qpqp = Matrix(BlockDiagonal([spdc_covar, spdc_covar]))
@@ -109,7 +109,7 @@ Added to the K-matrix before Wick evaluation of Bell-state overlap terms.
 # Returns
 32×32 `ComplexF64` loss matrix for fidelity calculations.
 """
-function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 4*mds, 4*mds)
     η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
 
@@ -139,7 +139,7 @@ Similar to `loss_bsm_matrix_fid`, but the signal modes (1, 2, 7, 8) are traced o
 # Returns
 32×32 `ComplexF64` loss matrix for probability-of-success calculations.
 """
-function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 4*mds, 4*mds)
     η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
 
@@ -178,7 +178,7 @@ Calculate a single element of the unnormalized spin-spin density matrix.
 # Returns
 Density matrix element for the ZALM source
 """
-function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)::ComplexF64
     η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
 
     # Calculate Ca based on dmi value
@@ -265,7 +265,7 @@ Calculate the density operator of the single-mode ZALM source on the spin-spin s
 # Returns
 Numerical complete spin density matrix
 """
-function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, nvec::Vector{Int})
+function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, nvec::Vector{Int})::Matrix{ComplexF64}
     lmat = 4
     mat = Matrix{ComplexF64}(undef, lmat, lmat)
     cov = covariance_matrix(μ)
@@ -360,7 +360,7 @@ Calculate the probability of photon-photon state generation with the given param
 # Returns
 Probability of successful photon-photon state generation
 """
-function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, dark_counts::Real)
+function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, dark_counts::Real)::Real
     cov = covariance_matrix(μ)
     A = k_function_matrix(cov) + loss_bsm_matrix_pgen(ηᵗ, ηᵈ, ηᵇ)
     Ainv = inv(A)
@@ -403,7 +403,7 @@ This computes the overlap ⟨Φ|ρ|Φ⟩ of the post-heralding photon-photon sta
 # Returns
 Real-valued Bell-state fidelity of the ZALM source for the given parameters.
 """
-function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)::Real
  # Calculate the fidelity with respect to the Bell state for the photon-photon single-mode ZALM source
 
     cov = covariance_matrix(μ)

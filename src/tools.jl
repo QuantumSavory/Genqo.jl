@@ -11,7 +11,7 @@ export wick_out, W, extract_W_terms, permutation_matrix, reorder, k_function_mat
 Precompute Wick partitions (perfect pairings) of 1:n
 Each partition is a Vector of (i, j) pairs (as Tuples)
 """
-function _wick_partitions(N::Int)
+function _wick_partitions(N::Int)::Array{Int, 3}
     @assert iseven(N) "N must be even"
 
     n_parts = prod(1:2:(N-1)) # number of perfect matchings of n elements
@@ -66,7 +66,7 @@ entries of `Ainv` and accumulates the result, then scales by `coef`.
 # Returns
 `coef` times the sum of all Wick-contraction products for this monomial.
 """
-function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{ComplexF64})
+function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{ComplexF64})::ComplexF64
     # Iterate over Wick partitions
     s = zero(ComplexF64)
     parts = wick_partitions[length(moment)]
@@ -126,7 +126,7 @@ Wick evaluation (exponents are 0/1 for the variables of interest).
 # Returns
 A `WTerms{<:Tuple}` whose buckets cover every degree present in `C`.
 """
-function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
+function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
     n_vars = nvars(parent(C))
 
     by_deg = Dict{Int, Tuple{Vector{ComplexF64}, Vector{Vector{Int}}}}()
@@ -179,7 +179,7 @@ used when terms have not been precompiled.
 # Returns
 Complex value of the Gaussian moment implied by `C` and `Ainv`.
 """
-function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})
+function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})::ComplexF64
     elm = zero(ComplexF64)
     n_vars = nvars(parent(C))
     for (mon, coeff) in zip(monomials(C), coefficients(C))
@@ -209,7 +209,7 @@ W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
 @inline _sum_buckets(bs::Tuple, Ainv::Matrix{ComplexF64}) =
     _W_bucket(first(bs), Ainv) + _sum_buckets(Base.tail(bs), Ainv)
 
-@inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64}) where {N}
+@inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64})::ComplexF64 where {N}
     parts = b.parts
     n_parts = size(parts, 1)
     n_pairs = N ÷ 2
@@ -244,9 +244,9 @@ Used to reorder rows/columns of a covariance matrix between mode orderings.
 # Returns
 n×n `Float64` permutation matrix.
 """
-function permutation_matrix(permutations::Vector{Int})
+function permutation_matrix(permutations::Vector{Int})::Matrix{Int}
     n = length(permutations)
-    P = zeros(n, n)
+    P = zeros(Int, n, n)
     for i in 1:n
         P[i, permutations[i]] = 1
     end
@@ -267,7 +267,7 @@ q-quadratures come before all p-quadratures. Required before calling `k_function
 # Returns
 Reordered covariance matrix in qqpp ordering.
 """
-function reorder(covariance_matrix::Union{Matrix{Float64}, BlockDiagonal{Float64, Matrix{Float64}}})
+function reorder(covariance_matrix::Matrix{Float64})::Matrix{Float64}
     sz = size(covariance_matrix)[1]
     perm_matrix = permutation_matrix([1:2:sz; 2:2:sz])
     return perm_matrix * covariance_matrix * perm_matrix'
@@ -292,7 +292,7 @@ arrays and reuses an LU factorization for Γ⁻¹.
 # Returns
 A `ComplexF64` matrix `K` (block diagonal `[BB, conj(BB)]`) suitable for `A = K + loss_matrix`.
 """
-function k_function_matrix(covariance::Matrix{Float64})
+function k_function_matrix(covariance::Matrix{Float64})::Matrix{ComplexF64}
     Γ = covariance + (1/2)*I
 
     # Invert Γ via LU (same numerical result as inv(Γ), but lets us reuse LU storage)

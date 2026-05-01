@@ -78,7 +78,7 @@ Construct the 24×24 covariance matrix for a SIGSAG source.
 # Returns
 24×24 `Float64` covariance matrix in qqpp ordering after beamsplitter transforms.
 """
-function covariance_matrix(μ::Real)
+function covariance_matrix(μ::Real)::Matrix{Float64}
     # Expand SPDC covariance matrix to 6 modes by adding vacuum modes
     covar_qpqp = zeros(2*mds, 2*mds)
     covar_qpqp[1:8, 1:8] = spdc.covariance_matrix(μ)
@@ -107,7 +107,7 @@ Added to the K-matrix before Wick evaluation of Bell-state overlap terms.
 # Returns
 24×24 `ComplexF64` loss matrix for fidelity calculations.
 """
-function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 4*mds, 4*mds)
     η = [ηᵈ, ηᵈ, ηᵗ, ηᵗ, ηᵗ, ηᵗ]
 
@@ -136,7 +136,7 @@ Similar to `loss_bsm_matrix_fid`, but measured modes (3–6) are traced out. Out
 # Returns
 24×24 `ComplexF64` loss matrix for probability-of-success calculations.
 """
-function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)
+function loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 4*mds, 4*mds)
     η = [ηᵈ, ηᵈ, ηᵗ, ηᵗ, ηᵗ, ηᵗ]
 
@@ -175,7 +175,7 @@ with the prefactor applied as a scalar at call time.
 # Returns
 Nemo multivariate polynomial over `ComplexField`.
 """
-function _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})
+function _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}
     Ca12 = α[1]*α[2]
     Cb12 = β[1]*β[2]
     prod = one(R)
@@ -232,7 +232,7 @@ Calculate the probability of photon-photon state generation for the SIGSAG sourc
 # Returns
 Real-valued probability of successful photon-photon state generation.
 """
-function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
+function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
     cov = covariance_matrix(μ)
     A = k_function_matrix(cov) + loss_bsm_matrix_pgen(ηᵗ, ηᵈ)
     Ainv = inv(A)
@@ -264,7 +264,7 @@ Computes the Bell-state overlap ⟨Φ|ρ|Φ⟩, where ρ is the normalized photo
 # Returns
 Real-valued Bell-state fidelity of the SIGSAG source for the given parameters.
 """
-function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
+function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
     cov = covariance_matrix(μ)
     A = k_function_matrix(cov) + loss_bsm_matrix_fid(ηᵗ, ηᵈ)
     Ainv = inv(A)

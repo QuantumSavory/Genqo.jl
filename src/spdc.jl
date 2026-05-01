@@ -59,7 +59,7 @@ Construct the 8×8 covariance matrix for an SPDC source.
 # Returns
 8×8 `Float64` covariance matrix in qpqp ordering.
 """
-function covariance_matrix(μ::Real)
+function covariance_matrix(μ::Real)::Matrix{Float64}
     tmsv_covar = tmsv.covariance_matrix(μ)
     covar = Matrix(BlockDiagonal([tmsv_covar, tmsv_covar]))
     covar_qpqp = _perm_matrix_12785634 * covar * _perm_matrix_12785634'
@@ -82,7 +82,7 @@ The resulting matrix is added to the K-matrix before Wick evaluation of Bell-sta
 # Returns
 16×16 `ComplexF64` loss matrix for fidelity: `A = k_function_matrix(cov) + loss_bsm_matrix_fid(ηᵗ, ηᵈ)`.
 """
-function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 16, 16)
     η = ηᵗ*ηᵈ
 
@@ -129,7 +129,7 @@ Calculate a single element of the unnormalized spin-spin density matrix for the 
 # Returns
 Complex density matrix element ρ[dmi, dmj] (unnormalized).
 """
-function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
+function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)::ComplexF64
     η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
 
     # Calculate Ca based on dmi value
@@ -210,7 +210,7 @@ Calculate the 4×4 spin-spin density matrix for the SPDC source conditioned on p
 # Returns
 4×4 `ComplexF64` normalized spin-spin density matrix.
 """
-function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})
+function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})::Matrix{ComplexF64}
     lmat = 4
     mat = Matrix{ComplexF64}(undef, lmat, lmat)
     cov = reorder(covariance_matrix(μ))
@@ -290,7 +290,7 @@ This computes the overlap ⟨Φ|ρ|Φ⟩ of the photon-photon state produced by 
 # Returns
 Real-valued Bell-state fidelity of the SPDC source for the given parameters.
 """
-function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
+function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
     cov = reorder(covariance_matrix(μ))
 
     Γ = cov + (1/2) * I
