@@ -11,16 +11,20 @@ export wick_out, W, extract_W_terms, permutation_matrix, reorder, k_function_mat
 Precompute Wick partitions (perfect pairings) of 1:n
 Each partition is a Vector of (i, j) pairs (as Tuples)
 """
-function _wick_partitions(n::Int)
-    @assert iseven(n) "n must be even"
-    
-    result = Vector{Vector{Tuple{Int,Int}}}()  # will hold all partitions
+function _wick_partitions(N::Int)
+    @assert iseven(N) "N must be even"
+
+    n_parts = prod(1:2:(N-1)) # number of perfect matchings of n elements
+
+    result = Array{Int, 3}(undef, n_parts, 2, N÷2) # will hold all partitions
     
     # Recursive helper
+    idx = 1
     function backtrack(remaining::Vector{Int}, current::Vector{Tuple{Int,Int}})
         if isempty(remaining)
             # Found a complete pairing
-            push!(result, copy(current))
+            result[idx, :, :] .= reshape(collect(Iterators.flatten(current)), (2, N÷2))
+            idx += 1
             return
         end
         
@@ -40,38 +44,63 @@ function _wick_partitions(n::Int)
         end
     end
     
-    backtrack(collect(1:n), Tuple{Int,Int}[])
+    backtrack(collect(1:N), Tuple{Int,Int}[])
+    @assert idx == n_parts + 1 "Expected to fill all $n_parts partitions, but filled $(idx-1)"
     return result
 end
-const wick_partitions = Dict(n => _wick_partitions(n) for n in (0, 2, 4, 6, 8)) # Precompute for n=0,2,4,6,8
+const wick_partitions = Dict(N => _wick_partitions(N) for N in (0, 2, 4, 6, 8)) # Precompute for N=0,2,4,6,8
 
 """
     wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
 
 Evaluate a single monomial term via Wick's theorem (sum over perfect pairings).
 
-For each Wick partition of the indices in `moment_vector`, multiplies the corresponding
+For each Wick partition of the indices in `moment`, multiplies the corresponding
 entries of `Ainv` and accumulates the result, then scales by `coef`.
 
 # Parameters
-- coef         : Complex coefficient of the monomial
-- moment_vector: Variable indices appearing in the monomial (length must be even)
-- Ainv         : Inverse A-matrix providing the two-point contractions
+- coef  : Complex coefficient of the monomial
+- moment: Variable indices appearing in the monomial (length must be even)
+- Ainv  : Inverse A-matrix providing the two-point contractions
 
 # Returns
 `coef` times the sum of all Wick-contraction products for this monomial.
 """
-function wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
+function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{ComplexF64})
     # Iterate over Wick partitions
-    coeff_sum = zero(ComplexF64)
-    for partition in wick_partitions[length(moment_vector)]
-        sum_factor = one(ComplexF64)
-        for (i,j) in partition
-            sum_factor *= Ainv[moment_vector[i], moment_vector[j]]
+    s = zero(ComplexF64)
+    parts = wick_partitions[length(moment)]
+    n_parts = size(parts, 1); n_pairs = size(parts, 3)
+    @inbounds for m in 1:n_parts
+        f = one(ComplexF64)
+        for n in 1:n_pairs
+            i = parts[m, 1, n]; j = parts[m, 2, n]
+            f *= Ainv[moment[i], moment[j]]
         end
-        coeff_sum += sum_factor
+        s += f
     end
-    return coeff_sum * coef
+    return s * coef
+end
+
+"""
+    wick_out(coef, m, parts, n_pairs, Ainv)
+
+Variant that reads monomial indices from a stack-resident `NTuple{8,Int}` `m` (zero-padded for
+shorter monomials). Avoids heap allocation entirely and lets the compiler keep `m` in registers.
+`n_pairs` selects how many index pairs of each partition to consume (4 for degree-8, 2 for degree-4).
+"""
+function wick_out(coef::ComplexF64, m::NTuple{8,Int}, parts::Array{Int,3}, n_pairs::Int, Ainv::Matrix{ComplexF64})
+    s = zero(ComplexF64)
+    n_parts = size(parts, 1)
+    @inbounds for k in 1:n_parts
+        f = one(ComplexF64)
+        for n in 1:n_pairs
+            i = parts[k, 1, n]; j = parts[k, 2, n]
+            f *= Ainv[m[i], m[j]]
+        end
+        s += f
+    end
+    return s * coef
 end
 
 """
@@ -96,21 +125,26 @@ evaluation (exponents are 0/1 for the variables of interest).
 # Returns
 `Vector{Tuple{ComplexF64, Vector{Int}}}` suitable for `W(terms, Ainv)`.
 """
-function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
+function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::Tuple{Vector{ComplexF64}, Matrix{Int}}
+    coeffs = coefficients(C)
+    mons = monomials(C)
     n_vars = nvars(parent(C))
-    terms = Vector{Tuple{ComplexF64, Vector{Int}}}()
+    c = Vector{ComplexF64}(undef, length(coeffs))
+    ξ = zeros(Int, 8, length(coeffs)) # each column will hold the variable indices for one monomial
 
-    for (mon, coeff) in zip(monomials(C), coefficients(C))
-        idxs = Int[]
-        sizehint!(idxs, 8)
-        @inbounds for i in 1:n_vars
+    x = 1
+    for (mon, coeff) in zip(mons, coeffs)
+        c[x] = ComplexF64(coeff)
+        y = 1
+        for i in 1:n_vars
             if exponent(mon, 1, i) == 1
-                push!(idxs, i)
+                ξ[y, x] = i
+                y += 1
             end
         end
-        push!(terms, (ComplexF64(coeff), idxs))
+        x += 1
     end
-    return terms
+    return c, ξ
 end
 
 """
@@ -147,16 +181,25 @@ This is the hot-path used by SPDC/ZALM fidelity and probability calculations. It
 each `(coef, idxs)` term represents one monomial, and `wick_out` performs the contraction.
 
 # Parameters
-- terms: Output of `extract_W_terms` for a specific moment polynomial
-- Ainv : Inverse A-matrix providing the contraction kernel
+- c   : Vector of complex coefficients
+- ξ   : Array of variable indices (each column represents a monomial)
+- Ainv: Inverse A-matrix providing the contraction kernel
 
 # Returns
 Complex value of the contracted moment.
 """
-function W(terms::Vector{Tuple{ComplexF64, Vector{Int}}}, Ainv::Matrix{ComplexF64})
+function W(cξ::Tuple{Vector{ComplexF64}, Matrix{Int}}, Ainv::Matrix{ComplexF64})
     elm = zero(ComplexF64)
-    @inbounds for (coef, idxs) in terms
-        elm += wick_out(coef, idxs, Ainv)
+    c, ξ = cξ
+    parts4 = wick_partitions[4]
+    parts8 = wick_partitions[8]
+    @inbounds for x in eachindex(c)
+        m = (ξ[1,x], ξ[2,x], ξ[3,x], ξ[4,x], ξ[5,x], ξ[6,x], ξ[7,x], ξ[8,x])
+        if m[5] == 0
+            elm += wick_out(c[x], m, parts4, 2, Ainv)
+        else
+            elm += wick_out(c[x], m, parts8, 4, Ainv)
+        end
     end
     return elm
 end

@@ -273,7 +273,7 @@ Precompiled Wick terms for SPDC moment polynomials.
 - Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
 - Exists to avoid repeated Nemo polynomial parsing during fidelity calculation.
 """
-const moment_terms::Dict{Int, Vector{Tuple{ComplexF64, Vector{Int}}}} = Dict(
+const moment_terms::Dict{Int, Tuple{Vector{ComplexF64}, Matrix{Int}}} = Dict(
     k => extract_W_terms(v) for (k, v) in moment_vector
 )
 
