@@ -1,6 +1,6 @@
 # Genqo.jl: A Gaussian State Quantum Optics Modeling Engine
 
-[![DOI](https://zenodo.org/badge/1114242875.svg)](https://doi.org/10.5281/zenodo.18870771)
+[![DOI](https://zenodo.org/badge/1114242875.svg)](https://doi.org/10.5281/zenodo.19937998)
 
 **Contents**
 - [Why Genqo?](#why-genqo)
@@ -18,7 +18,7 @@ Genqo is an open-source tool for modeling quantum entanglement sources such as S
 
 </div>
 
-Genqo allows for calculation of performance metrics such as entanglement rate, fidelity, and full density operators while sweeping mean photon number, dark counts, and various device and transmission losses. Thanks to Julia's JIT compilation feature, these metrics can be computed up to three orders of magnitude (115-1000x) faster than in Genqo's original Python implementation.
+Genqo allows for calculation of performance metrics such as entanglement rate, fidelity, and full density operators while sweeping mean photon number, dark counts, and various device and transmission losses. Thanks to Julia's JIT compilation feature, these metrics can be computed up to three orders of magnitude (130-1000x) faster than in Genqo's original Python implementation.
 
 <div align="center">
 
