@@ -83,68 +83,84 @@ function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{Co
 end
 
 """
-    wick_out(coef, m, parts, n_pairs, Ainv)
+    WBucket{N}
 
-Variant that reads monomial indices from a stack-resident `NTuple{8,Int}` `m` (zero-padded for
-shorter monomials). Avoids heap allocation entirely and lets the compiler keep `m` in registers.
-`n_pairs` selects how many index pairs of each partition to consume (4 for degree-8, 2 for degree-4).
+A homogeneous group of monomials that all have the same degree `N`. Stored as struct-of-arrays for
+cache locality, with indices as `NTuple{N,Int}` so the inner Wick loop reads them from registers.
+The `parts::Array{Int,3}` table is the same `wick_partitions[N]` cache, copied here so the kernel
+needs no Dict lookup at call time.
 """
-function wick_out(coef::ComplexF64, m::NTuple{8,Int}, parts::Array{Int,3}, n_pairs::Int, Ainv::Matrix{ComplexF64})
-    s = zero(ComplexF64)
-    n_parts = size(parts, 1)
-    @inbounds for k in 1:n_parts
-        f = one(ComplexF64)
-        for n in 1:n_pairs
-            i = parts[k, 1, n]; j = parts[k, 2, n]
-            f *= Ainv[m[i], m[j]]
-        end
-        s += f
-    end
-    return s * coef
+struct WBucket{N}
+    coeffs::Vector{ComplexF64}
+    indices::Vector{NTuple{N,Int}}
+    parts::Array{Int,3}
+end
+
+"""
+    WTerms{Buckets<:Tuple}
+
+A precompiled moment polynomial as a heterogeneous tuple of `WBucket`s, one per degree present in
+the polynomial. The tuple type carries each bucket's `N` at compile time so iteration unrolls and
+each `_W_bucket` call specializes on its bucket's degree.
+"""
+struct WTerms{Buckets<:Tuple}
+    buckets::Buckets
 end
 
 """
     extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
 
-Precompile a Nemo polynomial into a reusable list of contraction terms for `W`.
+Precompile a Nemo polynomial into a `WTerms` object suitable for the fast `W(::WTerms, Ainv)` path.
 
-The ZALM/SPDC code builds certain moment polynomials symbolically (in the `q/p` variables) and then
-evaluates them many times numerically. This function converts the polynomial into a vector of
-`(coef, idxs)` where:
-- `coef` is the complex coefficient of a monomial, and
-- `idxs` are the variable indices that appear with exponent 1 in that monomial.
+Walks `C`'s monomials, groups by degree (count of variables with exponent 1), and emits one
+`WBucket{N}` per present degree. Buckets are sorted by descending size so the largest one runs first.
 
-This avoids repeated Nemo monomial parsing and exponent scanning during hot loops.
+Performance is unimportant — this runs once at module load.
 
-Assumption (matched to current usage): moment polynomials are multilinear in the variables used for Wick
-evaluation (exponents are 0/1 for the variables of interest).
+Assumption (matched to current usage): moment polynomials are multilinear in the variables used for
+Wick evaluation (exponents are 0/1 for the variables of interest).
 
 # Parameters
 - C : Nemo multivariate polynomial over `ComplexField`
 
 # Returns
-`Vector{Tuple{ComplexF64, Vector{Int}}}` suitable for `W(terms, Ainv)`.
+A `WTerms{<:Tuple}` whose buckets cover every degree present in `C`.
 """
-function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::Tuple{Vector{ComplexF64}, Matrix{Int}}
-    coeffs = coefficients(C)
-    mons = monomials(C)
+function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
     n_vars = nvars(parent(C))
-    c = Vector{ComplexF64}(undef, length(coeffs))
-    ξ = zeros(Int, 8, length(coeffs)) # each column will hold the variable indices for one monomial
 
-    x = 1
-    for (mon, coeff) in zip(mons, coeffs)
-        c[x] = ComplexF64(coeff)
-        y = 1
+    by_deg = Dict{Int, Tuple{Vector{ComplexF64}, Vector{Vector{Int}}}}()
+    for (mon, coeff) in zip(monomials(C), coefficients(C))
+        idxs = Int[]
         for i in 1:n_vars
             if exponent(mon, 1, i) == 1
-                ξ[y, x] = i
-                y += 1
+                push!(idxs, i)
             end
         end
-        x += 1
+        N = length(idxs)
+        haskey(wick_partitions, N) ||
+            error("extract_W_terms: monomial of degree $N has no precomputed wick partitions (have keys $(sort(collect(keys(wick_partitions)))))")
+        cv, iv = get!(by_deg, N) do
+            (ComplexF64[], Vector{Int}[])
+        end
+        push!(cv, ComplexF64(coeff))
+        push!(iv, idxs)
     end
-    return c, ξ
+
+    # Sort by descending bucket size so the dominant bucket runs first.
+    degs_sorted = sort!(collect(keys(by_deg)); by = N -> -length(by_deg[N][1]))
+    buckets = ((_make_bucket(N, by_deg[N]...) for N in degs_sorted)...,)
+    return WTerms(buckets)
+end
+
+# Build a concrete `WBucket{N}` with N as a value-type-dispatched constant. Calling `WBucket{N}(...)`
+# directly with N as a runtime Int would also work but this keeps the construction call site clean.
+@inline function _make_bucket(N::Int, coeffs::Vector{ComplexF64}, idxs_list::Vector{Vector{Int}})
+    return _make_bucket_typed(Val(N), coeffs, idxs_list)
+end
+@inline function _make_bucket_typed(::Val{N}, coeffs::Vector{ComplexF64}, idxs_list::Vector{Vector{Int}}) where {N}
+    indices = [NTuple{N,Int}(idxs) for idxs in idxs_list]
+    return WBucket{N}(coeffs, indices, wick_partitions[N])
 end
 
 """
@@ -173,35 +189,45 @@ function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64
 end
 
 """
-    W(terms::Vector{Tuple{ComplexF64, Vector{Int}}}, Ainv::Matrix{ComplexF64})
+    W(t::WTerms, Ainv::Matrix{ComplexF64})
 
 Fast Wick evaluator for precompiled moment terms.
 
-This is the hot-path used by SPDC/ZALM fidelity and probability calculations. It skips Nemo entirely:
-each `(coef, idxs)` term represents one monomial, and `wick_out` performs the contraction.
-
-# Parameters
-- c   : Vector of complex coefficients
-- ξ   : Array of variable indices (each column represents a monomial)
-- Ainv: Inverse A-matrix providing the contraction kernel
+This is the hot path used by SPDC/ZALM fidelity and probability calculations. Each `WBucket{N}` in
+`t.buckets` carries its own monomial coefficients, indices (as `NTuple{N,Int}` per monomial), and
+the precomputed Wick partition table. The bucket loop is unrolled by the compiler because
+`Buckets<:Tuple` carries every bucket's type.
 
 # Returns
 Complex value of the contracted moment.
 """
-function W(cξ::Tuple{Vector{ComplexF64}, Matrix{Int}}, Ainv::Matrix{ComplexF64})
-    elm = zero(ComplexF64)
-    c, ξ = cξ
-    parts4 = wick_partitions[4]
-    parts8 = wick_partitions[8]
-    @inbounds for x in eachindex(c)
-        m = (ξ[1,x], ξ[2,x], ξ[3,x], ξ[4,x], ξ[5,x], ξ[6,x], ξ[7,x], ξ[8,x])
-        if m[5] == 0
-            elm += wick_out(c[x], m, parts4, 2, Ainv)
-        else
-            elm += wick_out(c[x], m, parts8, 4, Ainv)
+W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
+
+# Recursive helper so a heterogeneous Tuple iterates type-stably (a plain `for` would infer the
+# element type as the abstract join of the bucket types and dynamic-dispatch each call).
+@inline _sum_buckets(::Tuple{}, ::Matrix{ComplexF64}) = zero(ComplexF64)
+@inline _sum_buckets(bs::Tuple, Ainv::Matrix{ComplexF64}) =
+    _W_bucket(first(bs), Ainv) + _sum_buckets(Base.tail(bs), Ainv)
+
+@inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64}) where {N}
+    parts = b.parts
+    n_parts = size(parts, 1)
+    n_pairs = N ÷ 2
+    s = zero(ComplexF64)
+    @inbounds for x in eachindex(b.coeffs)
+        m = b.indices[x]                    # NTuple{N,Int}, stack-resident
+        f = zero(ComplexF64)
+        for k in 1:n_parts
+            t = one(ComplexF64)
+            for n in 1:n_pairs
+                i = parts[k, 1, n]; j = parts[k, 2, n]
+                t *= Ainv[m[i], m[j]]
+            end
+            f += t
         end
+        s += b.coeffs[x] * f
     end
-    return elm
+    return s
 end
 
 """

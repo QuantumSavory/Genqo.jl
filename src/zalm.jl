@@ -332,18 +332,16 @@ const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = begi
 end
 
 """
-    moment_terms::Dict{Int, Vector{Tuple{ComplexF64, Vector{Int}}}}
+    moment_terms::Dict{Int, tools.WTerms}
 
 Precompiled Wick terms for ZALM moment polynomials.
 
 - Keys match `moment_vector` (each key corresponds to a specific moment polynomial used in ZALM formulas).
-- Values are monomials encoded as `(coef, idxs)`:
-  - `coef::ComplexF64` = monomial coefficient
-  - `idxs::Vector{Int}` = variable indices appearing with exponent 1
+- Values are `tools.WTerms` objects bundling per-degree monomial buckets — see `tools.WBucket`.
 - Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
 - Exists to avoid repeated Nemo polynomial parsing during fidelity and probability_success.
 """
-const moment_terms::Dict{Int, Tuple{Vector{ComplexF64}, Matrix{Int}}} = Dict(
+const moment_terms::Dict{Int, tools.WTerms} = Dict(
     k => extract_W_terms(v) for (k, v) in moment_vector
 )
 
