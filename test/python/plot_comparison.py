@@ -119,13 +119,13 @@ ax.grid(axis='y', alpha=0.3)
 
 # Add legend
 legend_elements = [
-    Patch(facecolor='lightblue', label='Python toolbox'),
-    Patch(facecolor='lightcoral', label='Julia toolbox')
+    Patch(facecolor='lightblue', label='Genqo v0.1.0 (Python)'),
+    Patch(facecolor='lightcoral', label='Genqo v1.2.0 (Julia)')
 ]
 if first_run_dots:
     legend_elements += [
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Python first run'),
-        Line2D([0], [0], marker='o', color='w', markerfacecolor='orange', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Julia first run'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='lightblue', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Genqo v0.1.0 first run'),
+        Line2D([0], [0], marker='o', color='w', markerfacecolor='orange', markeredgecolor='black', markeredgewidth=0.3, markersize=4, label='Genqo v1.2.0 first run'),
     ]
 ax.legend(handles=legend_elements, loc='upper right')
 
