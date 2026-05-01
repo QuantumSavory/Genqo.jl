@@ -159,31 +159,64 @@ end
 loss_bsm_matrix_pgen(sigsag::SIGSAG) = loss_bsm_matrix_pgen(sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
 """
-    moment_vector(n1::Vector{Int}, n2::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
+    _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})
 
-Construct the symbolic moment polynomial for a SIGSAG coincidence measurement.
+Construct the *purely symbolic* moment polynomial for a SIGSAG coincidence measurement.
 
-Builds the Nemo polynomial encoding the joint detection event where signal modes (1, 2)
-contribute through ηᵈ and BSM modes (3–6) contribute photon numbers `n1` and `n2` through ηᵗ.
+This is the η-stripped version of the moment polynomial: the full physical moment is
+`ηᵈ² · ηᵗ^((sum(n1)+sum(n2))/2) · _moment_vector_sym(n1, n2)`. Stripping the numeric prefactor
+lets the symbolic part be cached and Wick-contracted via the precompiled `moment_terms` fast path,
+with the prefactor applied as a scalar at call time.
 
 # Parameters
 - n1  : Photon-number vector for BSM modes on one side (length 4)
 - n2  : Photon-number vector for BSM modes on the other side (length 4)
-- ηᵗ  : Outcoupling / transmission efficiency
-- ηᵈ  : Signal detection efficiency
 
 # Returns
 Nemo multivariate polynomial over `ComplexField`.
 """
-function moment_vector(n1::Vector{Int}, n2::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
-    Ca12 = ηᵈ * (α[1]*α[2])
-    Cb12 = ηᵈ * (β[1]*β[2])
+function _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})
+    Ca12 = α[1]*α[2]
+    Cb12 = β[1]*β[2]
     prod = one(R)
     for i in 3:mds
-        prod *= (α[i]*sqrt(ηᵗ))^n1[i-2]/factorial(n1[i-2]) * (β[i]*sqrt(ηᵗ))^n2[i-2]/factorial(n2[i-2])
+        prod *= α[i]^n1[i-2]/factorial(n1[i-2]) * β[i]^n2[i-2]/factorial(n2[i-2])
     end
     return Ca12 * Cb12 * prod
 end
+
+"""
+    moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}}
+
+Symbolic moment polynomials used by SIGSAG. Each polynomial is the η-stripped part of a
+specific Gaussian moment; the full physical moment recovers a `ηᵈ²·ηᵗ^k` prefactor at call time.
+
+Keys:
+- `0` — `α[1]α[2]·β[1]β[2]` — used by `probability_success` (prefactor `ηᵈ²`)
+- `1`–`4` — Bell-state overlap moments for the four `(n1, n2)` patterns used by `fidelity`
+  (prefactor `ηᵈ²·ηᵗ²`)
+"""
+const moment_vector::Dict{Int, Nemo.Generic.MPoly{Nemo.ComplexFieldElem}} = Dict(
+    0 => _moment_vector_sym([0,0,0,0], [0,0,0,0]),
+    1 => _moment_vector_sym([1,0,0,1], [1,0,0,1]),
+    2 => _moment_vector_sym([0,1,1,0], [0,1,1,0]),
+    3 => _moment_vector_sym([1,0,0,1], [0,1,1,0]),
+    4 => _moment_vector_sym([0,1,1,0], [1,0,0,1]),
+)
+
+"""
+    moment_terms::Dict{Int, tools.WTerms}
+
+Precompiled Wick terms for SIGSAG moment polynomials.
+
+- Keys match `moment_vector`.
+- Values are `tools.WTerms` objects bundling per-degree monomial buckets — see `tools.WBucket`.
+- Used by `tools.W(moment_terms[k], Ainv)` for fast Gaussian moment evaluation via Wick pairings.
+- Exists to avoid repeated Nemo polynomial parsing during fidelity and probability_success.
+"""
+const moment_terms::Dict{Int, tools.WTerms} = Dict(
+    k => extract_W_terms(v) for (k, v) in moment_vector
+)
 
 
 """
@@ -211,9 +244,8 @@ function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
     D3 = conj(detΓ)^(1/4)
     Coef = 1/(D1*D2*D3)
 
-    C = ηᵈ^2 * (α[1]*α[2]) * (β[1]*β[2]) # moment_vector([0,0,0,0], [0,0,0,0], ηᵗ, ηᵈ)
-
-    return real(Coef * W(C, Ainv))
+    # Full moment is ηᵈ² · α[1]α[2]·β[1]β[2]; symbolic part cached as moment_terms[0].
+    return real(Coef * ηᵈ^2 * W(moment_terms[0], Ainv))
 end
 probability_success(sigsag::SIGSAG) = probability_success(sigsag.mean_photon, sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
@@ -239,12 +271,13 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
     Γ = cov + (1/2)*I
     detΓ = det(Γ)
 
-    # Wick terms (cached)
+    # Wick terms (cached). Each fidelity moment carries a numeric prefactor ηᵈ²·ηᵗ²
+    # (sum(n1)+sum(n2) = 4 ⇒ ηᵗ^(4/2) = ηᵗ²); the symbolic part is moment_terms[1..4].
     Fsum =
-        W(moment_vector([1,0,0,1], [1,0,0,1], ηᵗ, ηᵈ), Ainv) +
-        W(moment_vector([0,1,1,0], [0,1,1,0], ηᵗ, ηᵈ), Ainv) +
-        W(moment_vector([1,0,0,1], [0,1,1,0], ηᵗ, ηᵈ), Ainv) +
-        W(moment_vector([0,1,1,0], [1,0,0,1], ηᵗ, ηᵈ), Ainv)
+        W(moment_terms[1], Ainv) +
+        W(moment_terms[2], Ainv) +
+        W(moment_terms[3], Ainv) +
+        W(moment_terms[4], Ainv)
 
     D1 = sqrt(det(A))
     D2 = detΓ^(1/4)
@@ -252,7 +285,7 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
 
     pgen = probability_success(μ, ηᵗ, ηᵈ)
 
-    coef = 1 / (2 * D1 * D2 * D3 * pgen)
+    coef = ηᵈ^2 * ηᵗ^2 / (2 * D1 * D2 * D3 * pgen)
 
     value = coef * Fsum
     if abs(imag(value)) > 1e-10
