@@ -112,12 +112,12 @@ function zalm_covariance_matrix_old(μ::Real)
     # Reorder qpqp → qqpp and apply beamsplitters
     covar_qqpp = tools.reorder(covar_qpqp) 
 
-    return zalm._S46 * zalm._S35 * covar_qqpp * zalm._S35' * zalm._S46' # or similar pattern
+    return zalm._S46 * zalm._S35 * covar_qqpp * zalm._S35' * zalm._S46' 
 end
 zalm_covariance_matrix_old(zalm::zalm.ZALM) = zalm_covariance_matrix_old(zalm.mean_photon)
 
 suite["zalm.covariance_matrix_new"]      = @benchmarkable zalm.covariance_matrix(z)           setup=(z=rand_zalm())
-suite["zalm.covariance_matrix_old"]      = @benchmarkable zalm_covariance_matrix_old(z)           setup=(z=rand_zalm())
+suite["zalm.covariance_matrix_old"]      = @benchmarkable zalm_covariance_matrix_old(z)       setup=(z=rand_zalm())
 
 results = run(suite)
 for (func, trial) in results
