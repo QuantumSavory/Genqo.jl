@@ -129,7 +129,26 @@ used when terms have not been precompiled.
 # Returns
 Complex value of the Gaussian moment implied by `C` and `Ainv`.
 """
-function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})
+function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64}, hafnian::Bool=false, sparse::Bool=false)
+    if hafnian
+        monos = monomials(C)
+        n_vars = nvars(parent(C))
+        idexs = Int[]
+
+        for i in 1:n_vars
+            if exponent(monos[1], 1, i) == 1
+                push!(idexs, i)
+            end
+        end
+
+        # create subA 
+        subA = Ainv[idexs, idexs]
+        if sparse
+            return hafnian_sparse(subA)
+        end
+        return recursive_algorithm(subA)
+    end
+
     elm = zero(ComplexF64)
     n_vars = nvars(parent(C))
     for (mon, coeff) in zip(monomials(C), coefficients(C))
@@ -153,7 +172,17 @@ each `(coef, idxs)` term represents one monomial, and `wick_out` performs the co
 # Returns
 Complex value of the contracted moment.
 """
-function W(terms::Vector{Tuple{ComplexF64, Vector{Int}}}, Ainv::Matrix{ComplexF64})
+function W(terms::Vector{Tuple{ComplexF64, Vector{Int}}}, Ainv::Matrix{ComplexF64}, hafnian::Bool=false, sparse::Bool=false)
+    if hafnian
+        _, idxs = terms[1]
+
+        subA = @view Ainv[idxs, idxs]
+        if sparse
+            return hafnian_sparse(subA)
+        end
+        return recursive_algorithm(Matrix(subA))
+    end
+    
     elm = zero(ComplexF64)
     @inbounds for (coef, idxs) in terms
         elm += wick_out(coef, idxs, Ainv)
@@ -269,5 +298,169 @@ function k_function_matrix(covariance::Matrix{Float64})
 
     return K
 end
+"""
+    hafnian_sparse(A::AbstractMatrix{ComplexF64}; D::Union{Nothing, Set{Int}}=nothing)  
+    Given a complex matrix `A`, compute its hafnian using a sparse recursive algorithm as descrived in 
+    the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
+    This function is slow on full matrces but faster on sparce matrices.
+        # Parameters
+    - A : A complex matrix, a submatrix of Ainv.
+    - D : An optional set of indices to consider for the hafnian calculation. If not provided, all indices are used.
 
+    # Returns
+    A `ComplexF64` number representing the hafnian of `A`.
+"""
+function hafnian_sparse(A::AbstractMatrix{ComplexF64}; D::Union{Nothing, Set{Int}}=nothing)  
+    n = size(A, 1)
+
+    Dset = D === nothing ? Set(1:n) : Set(D)
+
+    B = copy(A)
+    for i in 1:n
+        B[i, i] = zero(ComplexF64)
+    end
+
+    # Python: if np.allclose(A, 0): return 0.0
+    if all(x -> isapprox(x, zero(ComplexF64); atol=1e-12, rtol=1e-12), B)
+        return zero(ComplexF64)
+    end
+
+    # Memoization cache.
+    # Use sorted tuples as keys because Set is mutable and unsafe as a Dict key.
+    cache = Dict{Tuple{Vararg{Int}}, ComplexF64}()
+
+    function lhaf(d::Set{Int})::ComplexF64
+        key = Tuple(sort(collect(d)))
+
+        if haskey(cache, key)
+            return cache[key]
+        end
+
+        if isempty(d)
+            return one(ComplexF64)
+        end
+
+        d_without_k = copy(d)
+        k = pop!(d_without_k)
+
+        # Python: indices(d, k) = d ∩ nonzero(A[k, :])
+        nonzero_cols = findall(j -> !iszero(B[k, j]), 1:n)
+        js = intersect(d, Set(nonzero_cols))
+
+        result = zero(ComplexF64)
+        for j in js
+            next_d = setdiff(d_without_k, Set([j]))
+            result += B[j, k] * lhaf(next_d)
+        end
+
+        cache[key] = result
+        return result
+    end
+
+    return lhaf(Dset)
+end
+
+"""
+        recursive_algorithm(A::Matrix{ComplexF64})
+
+    Given a complex matrix `A`, compute its hafnian using a recursive recursive algorithm as descrived in 
+    the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
+    Time complexity of O(n4log(n)2^n/2).
+        # Parameters
+    - A : A complex matrix, a submatrix of Ainv.
+
+    # Returns
+    A `ComplexF64` number representing the hafnian of `A`.
+"""
+function recursive_algorithm(A::Matrix{ComplexF64})
+    nb_lines = size(A,1)
+
+    if nb_lines % 2 != 0
+        return 0
+    end
+
+    n = nb_lines ÷ 2
+
+    z = zeros(ComplexF64, n * (2n - 1), n + 1)
+
+    for j in 1:(2n - 1)
+        ind = j * (j - 1) ÷ 2
+        for k in 0:(j - 1)
+            z[ind + k + 1, 1] = A[j + 1, k + 1]
+        end
+    end
+
+    g = zeros(ComplexF64, n + 1)
+    g[1] = one(ComplexF64)
+
+    return solve_recursive(z, 2n, 1, g, n)
+end
+
+"""
+    solve_recursive(b::Matrix{ComplexF64}, s::Int, w::Int, g::AbstractVector{ComplexF64}, n::Int)
+
+    Helper function for the recursive hafnian algorithm. Solves the recursive structure of the hafnian calculation.
+
+    # Parameters
+    - b : matrix transformed recursively
+    - s : size of the original matrix transformed at every recursion.
+    - w : A weight factor that alternates between 1 and -1 to account for the recursive structure.
+    - g : A vector that accumulates intermediate results during the recursion.
+    - n : size of the original matrix divided by 2.
+
+    # Returns
+    A `ComplexF64` number representing the intermediate result of the hafnian calculation at this stage of recursion.
+"""
+function solve_recursive(
+    b::Matrix{ComplexF64},
+    s::Int,
+    w::Int,
+    g::AbstractVector{ComplexF64},
+    n::Int,
+)
+
+    if s == 0
+        return w * g[n + 1]
+    end
+
+    c = zeros(ComplexF64, ((s - 2) * (s - 3)) ÷ 2, n + 1)
+
+    i = 1
+
+    for j in 1:(s - 3)
+        for k in 0:(j - 1)
+            src_row = ((j + 1) * (j + 2)) ÷ 2 + k + 3
+            c[i, :] .= b[src_row, :]
+            i += 1
+        end
+    end
+
+    h = solve_recursive(c, s - 2, -w, g, n)
+
+    e = copy(g)
+
+    for u in 0:(n - 1)
+        for v in 0:(n - u - 1)
+            e[u + v + 2] += g[u + 1] * b[1, v + 1]
+        end
+    end
+
+    for j in 1:(s - 3)
+        for k in 0:(j - 1)
+            c_row = j * (j - 1) ÷ 2 + k + 1
+
+            for u in 0:(n - 1)
+                for v in 0:(n - u - 1)
+                    c[c_row, u + v + 2] +=
+                        b[((j + 1) * (j + 2)) ÷ 2 + 1, u + 1] *
+                        b[((k + 1) * (k + 2)) ÷ 2 + 2, v + 1] +
+                        b[((k + 1) * (k + 2)) ÷ 2 + 1, u + 1] *
+                        b[((j + 1) * (j + 2)) ÷ 2 + 2, v + 1]
+                end
+            end
+        end
+    end
+
+    return h + solve_recursive(c, s - 2, w, e, n)
+end
 end # module

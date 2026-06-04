@@ -384,10 +384,10 @@ function probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, da
     C4 = moment_terms[14]
 
     return real(Coef * (
-        ηᵇ^2 * (1-dark_counts)^4 * W(C1, Ainv) +
-        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C2, Ainv) +
-        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C3, Ainv) +
-        dark_counts^2 * (1-dark_counts)^2 * W(C4, Ainv)
+        ηᵇ^2 * (1-dark_counts)^4 * W(C1, Ainv, true) +
+        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C2, Ainv, true) +
+        ηᵇ * dark_counts * (1-dark_counts)^3 * W(C3, Ainv, true) +
+        dark_counts^2 * (1-dark_counts)^2 * W(C4, Ainv, true)
     ))
 end
 probability_success(zalm::ZALM) = probability_success(zalm.mean_photon, zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency, zalm.dark_counts)
@@ -424,10 +424,10 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
 
     # Wick terms (cached)
     Fsum =
-        W(moment_terms[1], Ainv1) +
-        W(moment_terms[2], Ainv1) +
-        W(moment_terms[3], Ainv1) +
-        W(moment_terms[4], Ainv1)
+        W(moment_terms[1], Ainv1, true, true) +
+        W(moment_terms[2], Ainv1, true, true) +
+        W(moment_terms[3], Ainv1, true, true) +
+        W(moment_terms[4], Ainv1, true, true)
 
     # --- A2 (trace / generation normalization loss) ---
     A2 = K + loss_bsm_matrix_pgen(ηᵗ, ηᵈ, ηᵇ)
@@ -435,7 +435,7 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
     Ainv2 = inv(factoredA2)
     N2 = sqrt(det(factoredA2)) # reuses factorization
     
-    Trc = W(moment_terms[0], Ainv2)  # <-- cached + defined
+    Trc = W(moment_terms[0], Ainv2, false, false)  # <-- cached + defined
 
     N1 = (ηᵈ * ηᵗ) ^ 2
     coef = N1 * N2 / (2 * D1)
