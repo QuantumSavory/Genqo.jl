@@ -18,11 +18,11 @@ abstract type ComputeStep end
 struct AMatrix <: ComputeStep
     detectors::Vector{Union{Detector, Nothing}}
 end
-function compute!(amat::AMatrix, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Matrix{ComplexF64}
+function compute!(amat::AMatrix, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Tuple{Matrix{ComplexF64}, ComplexF64}
     get!(cache, amat) do
         # Compute the A⁻¹ matrix from the Gaussian state covariance matrix
         A = k_function_matrix(register.state.covariance) + G_matrix(amat.detectors, register.mds)
-        return inv(A)
+        return inv(A), det(A)
     end
 end
 
@@ -64,11 +64,11 @@ struct Probability <: Metric
 end
 function compute!(probability::Probability, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Float64
     # Compute the probability of the given detection outcome by building the appropriate moment polynomial and performing the necessary Wick contractions
-    Ainv = compute!(AMatrix(register.detectors), register, cache)
+    Ainv, detA = compute!(AMatrix(register.detectors), register, cache)
     C = compute!(CPoly(probability.detection_outcome), register, cache)
     Γ = register.state.covariance + 0.5*I
     detΓ = det(Γ)
-    return (sqrt(det(Ainv)) / (detΓ^0.25 * conj(detΓ)^0.25)) * W(C, Ainv)
+    return (1 / (sqrt(detA) * detΓ^0.25 * conj(detΓ)^0.25)) * W(C, Ainv)
 end
 
 # Compute fidelity of post-selected state with respect to ideal target state
