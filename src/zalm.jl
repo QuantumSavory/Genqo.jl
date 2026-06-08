@@ -424,10 +424,10 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
 
     # Wick terms (cached)
     Fsum =
-        W(moment_terms[1], Ainv1, true, true) +
-        W(moment_terms[2], Ainv1, true, true) +
-        W(moment_terms[3], Ainv1, true, true) +
-        W(moment_terms[4], Ainv1, true, true)
+        W(moment_terms[1], Ainv1, true, false) +
+        W(moment_terms[2], Ainv1, true, false) +
+        W(moment_terms[3], Ainv1, true, false) +
+        W(moment_terms[4], Ainv1, true, false)
 
     # --- A2 (trace / generation normalization loss) ---
     A2 = K + loss_bsm_matrix_pgen(ηᵗ, ηᵈ, ηᵇ)

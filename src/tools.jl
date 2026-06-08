@@ -298,17 +298,20 @@ function k_function_matrix(covariance::Matrix{Float64})
 
     return K
 end
+
 """
     hafnian_sparse(A::AbstractMatrix{ComplexF64}; D::Union{Nothing, Set{Int}}=nothing)  
-    Given a complex matrix `A`, compute its hafnian using a sparse recursive algorithm as descrived in 
-    the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
-    This function is slow on full matrces but faster on sparce matrices.
-        # Parameters
-    - A : A complex matrix, a submatrix of Ainv.
-    - D : An optional set of indices to consider for the hafnian calculation. If not provided, all indices are used.
 
-    # Returns
-    A `ComplexF64` number representing the hafnian of `A`.
+Given a complex matrix `A`, compute its hafnian using a sparse recursive algorithm as descrived in 
+the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
+This function is slow on full matrces but faster on sparce matrices.
+
+# Parameters
+- A : A complex matrix, a submatrix of Ainv.
+- D : An optional set of indices to consider for the hafnian calculation. If not provided, all indices are used.
+
+# Returns
+A `ComplexF64` number representing the hafnian of `A`.
 """
 function hafnian_sparse(A::AbstractMatrix{ComplexF64}; D::Union{Nothing, Set{Int}}=nothing)  
     n = size(A, 1)
@@ -361,16 +364,16 @@ function hafnian_sparse(A::AbstractMatrix{ComplexF64}; D::Union{Nothing, Set{Int
 end
 
 """
-        recursive_algorithm(A::Matrix{ComplexF64})
+    recursive_algorithm(A::Matrix{ComplexF64})
 
-    Given a complex matrix `A`, compute its hafnian using a recursive recursive algorithm as descrived in 
-    the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
-    Time complexity of O(n4log(n)2^n/2).
-        # Parameters
-    - A : A complex matrix, a submatrix of Ainv.
+Given a complex matrix `A`, compute its hafnian using a recursive recursive algorithm as descrived in 
+the documentation for The Walrus library (https://the-walrus.readthedocs.io/en/latest/algorithms.html).
+Time complexity of O(n4log(n)2^n/2).
+# Parameters
+- A : A complex matrix, a submatrix of Ainv.
 
-    # Returns
-    A `ComplexF64` number representing the hafnian of `A`.
+# Returns
+A `ComplexF64` number representing the hafnian of `A`.
 """
 function recursive_algorithm(A::Matrix{ComplexF64})
     nb_lines = size(A,1)
@@ -399,17 +402,17 @@ end
 """
     solve_recursive(b::Matrix{ComplexF64}, s::Int, w::Int, g::AbstractVector{ComplexF64}, n::Int)
 
-    Helper function for the recursive hafnian algorithm. Solves the recursive structure of the hafnian calculation.
+Helper function for the recursive hafnian algorithm. Solves the recursive structure of the hafnian calculation.
 
-    # Parameters
-    - b : matrix transformed recursively
-    - s : size of the original matrix transformed at every recursion.
-    - w : A weight factor that alternates between 1 and -1 to account for the recursive structure.
-    - g : A vector that accumulates intermediate results during the recursion.
-    - n : size of the original matrix divided by 2.
+# Parameters
+- b : matrix transformed recursively
+- s : size of the original matrix transformed at every recursion.
+- w : A weight factor that alternates between 1 and -1 to account for the recursive structure.
+- g : A vector that accumulates intermediate results during the recursion.
+- n : size of the original matrix divided by 2.
 
-    # Returns
-    A `ComplexF64` number representing the intermediate result of the hafnian calculation at this stage of recursion.
+# Returns
+A `ComplexF64` number representing the intermediate result of the hafnian calculation at this stage of recursion.
 """
 function solve_recursive(
     b::Matrix{ComplexF64},
