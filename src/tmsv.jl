@@ -51,7 +51,7 @@ Construct the covariance matrix for a TMSV state.
 # Returns
 The covariance matrix for the TMSV state, in the qpqp ordering
 """
-covariance_matrix(μ::Real) = [
+covariance_matrix(μ::Real)::Matrix{Float64} = [
     0.5 + μ        0               sqrt(μ*(μ+1))  0;
     0              0.5 + μ         0              -sqrt(μ*(μ+1));
     sqrt(μ*(μ+1))  0               0.5 + μ        0;
@@ -70,7 +70,7 @@ Construct the loss contribution to the A-matrix for TMSV probability-of-success 
 # Returns
 8×8 `ComplexF64` loss matrix for use in `A = k_function_matrix(cov) + loss_matrix_pgen(ηᵈ)`.
 """
-function loss_matrix_pgen(ηᵈ::Real)
+function loss_matrix_pgen(ηᵈ::Real)::Matrix{ComplexF64}
     G = zeros(ComplexF64, 8, 8)
 
     for i in 1:2
@@ -98,7 +98,7 @@ representing the n-photon coincidence moment. Evaluated at `n=1` for `probabilit
 # Returns
 Nemo multivariate polynomial over `ComplexField`.
 """
-function moment_vector(n::Int)
+function moment_vector(n::Int)::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}
     (α[1]*α[2])^n / factorial(n) * (β[1]*β[2])^n / factorial(n)
 end
 
@@ -114,7 +114,7 @@ Calculate the probability of photon-photon state generation with the given param
 # Returns
 Probability of successful photon-photon state generation
 """
-function probability_success(μ::Real, ηᵈ::Real)
+function probability_success(μ::Real, ηᵈ::Real)::Real
     # Compute covariance matrix and reorder qpqp → qqpp
     cov = reorder(covariance_matrix(μ))
 

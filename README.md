@@ -18,7 +18,7 @@ Genqo is an open-source tool for modeling quantum entanglement sources such as S
 
 </div>
 
-Genqo allows for calculation of performance metrics such as entanglement rate, fidelity, and full density operators while sweeping mean photon number, dark counts, and various device and transmission losses. Thanks to Julia's JIT compilation feature, these metrics can be computed up to three orders of magnitude (115-1000x) faster than in Genqo's original Python implementation.
+Genqo allows for calculation of performance metrics such as entanglement rate, fidelity, and full density operators while sweeping mean photon number, dark counts, and various device and transmission losses. Thanks to Julia's JIT compilation feature, these metrics can be computed up to three orders of magnitude (130-1000x) faster than in Genqo's original Python implementation.
 
 <div align="center">
 
