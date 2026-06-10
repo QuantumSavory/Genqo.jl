@@ -1,10 +1,21 @@
 """Pytest configuration for genqo tests."""
+from __future__ import annotations
 
-import pytest
+import json
+import os
+from typing import TYPE_CHECKING
+
 import numpy as np
+import pytest
 
 import genqo_old as gqpy
-import genqo as gqjl
+
+if TYPE_CHECKING:
+    import genqo as gqjl
+
+
+def pytest_addoption(parser):
+    parser.addoption("--bench-dir", default=None, help="Directory to save benchmark artifacts")
 
 
 @pytest.fixture
@@ -128,6 +139,7 @@ def tmsv_py(tmsv_test_case_rand: dict) -> gqpy.TMSV:
 
 @pytest.fixture
 def tmsv_jl(tmsv_test_case_rand: dict) -> gqjl.TMSV:
+    import genqo as gqjl
     return gqjl.TMSV().set(**tmsv_test_case_rand)
 
 @pytest.fixture
@@ -138,6 +150,7 @@ def spdc_py(spdc_test_case_rand: dict) -> gqpy.SPDC:
 
 @pytest.fixture
 def spdc_jl(spdc_test_case_rand: dict) -> gqjl.SPDC:
+    import genqo as gqjl
     return gqjl.SPDC().set(**spdc_test_case_rand)
 
 @pytest.fixture
@@ -148,6 +161,7 @@ def zalm_py(zalm_test_case_rand: dict) -> gqpy.ZALM:
 
 @pytest.fixture
 def zalm_jl(zalm_test_case_rand: dict) -> gqjl.ZALM:
+    import genqo as gqjl
     return gqjl.ZALM().set(**zalm_test_case_rand)
 
 @pytest.fixture
@@ -158,4 +172,15 @@ def sigsag_py(sigsag_test_case_rand: dict) -> gqpy.SIGSAG_BS:
 
 @pytest.fixture
 def sigsag_jl(sigsag_test_case_rand: dict) -> gqjl.SIGSAG:
+    import genqo as gqjl
     return gqjl.SIGSAG().set(**sigsag_test_case_rand)
+
+@pytest.fixture(scope="session")
+def precision_table(request):
+    rows = []
+    yield rows
+    bench_dir = request.config.getoption("--bench-dir")
+    if bench_dir:
+        os.makedirs(bench_dir, exist_ok=True)
+        with open(os.path.join(bench_dir, "precision_raw.json"), "w") as f:
+            json.dump(rows, f, indent=2)
