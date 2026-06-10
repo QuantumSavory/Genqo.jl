@@ -2,7 +2,7 @@ module metrics
 
 using LinearAlgebra
 
-using ..tools: W, extract_W_terms, k_function_matrix
+using ..tools: W, WTerms, extract_W_terms, k_function_matrix
 using ..gates
 using ..states
 using ..registers
@@ -30,7 +30,7 @@ end
 struct CPoly <: ComputeStep
     detection_outcome::MeasurementOutcome
 end
-function compute!(cpoly::CPoly, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Vector{Tuple{ComplexF64, Vector{Int}}}
+function compute!(cpoly::CPoly, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::WTerms
     get!(cache, cpoly) do
         # Compute the C polynomial from the measurement spec
         C = one(register.R)
