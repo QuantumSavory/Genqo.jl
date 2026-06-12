@@ -20,13 +20,23 @@ PhotonThresholdDetector() = PhotonThresholdDetector(0)
 
 
 # G matrix only cares about the type of measurement (photon number vs trace out) and not the specific outcome, so we can compute it directly from the detector layout
-function G_matrix(detectors::Vector{Union{Detector, Nothing}}, mds::Int)::Matrix{ComplexF64}
-    # Expansion of |α|² + |β|²
+function G_matrix(η::Vector{Float64}, detectors::Vector{Union{Detector, Nothing}}, mds::Int)::Matrix{ComplexF64}
+    # Expansion of (|α|² + |β|²)(1 - η) / 2
+    # G = diagm(ComplexF64.(vcat(η, η, η, η) / 2))
     G = 0.5 * Matrix{ComplexF64}(I, 4mds, 4mds)
 
     for (i, detector) in enumerate(detectors)
         if detector isa PhotonNumDetector
             # Fock term (αβ*)ⁿ/n! is handled in the moment polynomial C, as it is not inside an exp()
+            # Expansion of αβ*(1 - η)
+            G[i,      i+2mds] = -0.5 * (1 - η[i])
+            G[i,      i+3mds] = 0.5im * (1 - η[i])
+            G[i+mds,  i+2mds] = -0.5im * (1 - η[i])
+            G[i+mds,  i+3mds] = -0.5 * (1 - η[i])
+            G[i+2mds, i     ] = -0.5 * (1 - η[i])
+            G[i+2mds, i+mds ] = -0.5im * (1 - η[i])
+            G[i+3mds, i     ] = 0.5im * (1 - η[i])
+            G[i+3mds, i+mds ] = -0.5 * (1 - η[i])
 
         elseif detector isa PhotonThresholdDetector
             # TODO

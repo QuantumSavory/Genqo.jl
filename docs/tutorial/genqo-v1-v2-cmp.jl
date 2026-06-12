@@ -44,7 +44,7 @@ end
 zalm_Pg_ground = zalm.probability_success.(μ, 1, 1, η', 0)
 zalm_Pg_new = zalm_probability.(μ, η')
 
-plot(μ, zalm_Pg_ground, label="Ground truth", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=[1 2 3 4])
+plot(μ, zalm_Pg_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=[1 2 3 4])
 plot!(μ, zalm_Pg_new, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
 
 ## Single Sagnac Probability of Success
@@ -75,5 +75,5 @@ end
 sigsag_Pg_ground = sigsag.probability_success.(μ, 1, 1, η', 0)
 sigsag_Pg_new = sigsag_probability.(μ, η')
 
-plot(μ, sigsag_Pg_ground, label="Ground truth", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright)
+plot(μ, sigsag_Pg_ground, label="Genqo v1", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright)
 plot!(μ, sigsag_Pg_new, label="Genqo v2", linestyle=:dash)

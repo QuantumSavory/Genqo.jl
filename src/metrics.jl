@@ -21,7 +21,7 @@ end
 function compute!(amat::AMatrix, register::QuantumRegister, cache::Dict{ComputeStep, Any} = [])::Tuple{Matrix{ComplexF64}, ComplexF64}
     get!(cache, amat) do
         # Compute the A⁻¹ matrix from the Gaussian state covariance matrix
-        A = k_function_matrix(register.state.covariance) + G_matrix(amat.detectors, register.mds)
+        A = k_function_matrix(register.state.covariance) + G_matrix(register.losses, amat.detectors, register.mds)
         return inv(A), det(A)
     end
 end
@@ -34,9 +34,9 @@ function compute!(cpoly::CPoly, register::QuantumRegister, cache::Dict{ComputeSt
     get!(cache, cpoly) do
         # Compute the C polynomial from the measurement spec
         C = one(register.R)
-        for (measurement, α, β) in zip(cpoly.detection_outcome.measurements, register.α, register.β)
+        for (measurement, η, α, β) in zip(cpoly.detection_outcome.measurements, register.losses, register.α, register.β)
             if measurement isa PhotonNumMeasurement && measurement.n == 1
-                C *= (α * β)
+                C *= (α * β * η)
             # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
             # tools.W() will need to be generalized
             end

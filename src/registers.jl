@@ -21,6 +21,7 @@ end
 Base.@kwdef mutable struct QuantumRegister
     mds::Int
     state::QuantumState
+    losses::Vector{Float64}
     detectors::Vector{Union{Detector, Nothing}}
     builder::CircuitBuilder
 
@@ -36,6 +37,7 @@ end
 function QuantumRegister(mds::Int)
     # TODO: can we infer the best engine to start with? or at least have user specify
     state = VacuumState(mds)
+    losses = ones(Float64, mds)
     detectors = fill(nothing, mds) # Initialize with no detectors
     builder = CircuitBuilder()
 
@@ -54,7 +56,7 @@ function QuantumRegister(mds::Int)
     α = (qai + i .* pai) / sqrt(2)
     β = (qbi - i .* pbi) / sqrt(2)
 
-    return QuantumRegister(mds, state, detectors, builder, R, qai, pai, qbi, pbi, α, β)
+    return QuantumRegister(mds, state, losses, detectors, builder, R, qai, pai, qbi, pbi, α, β)
 end
 
 struct ModeRef

@@ -32,6 +32,7 @@ function fuse!(circuit::Circuit)
     circuit.register.builder.ops_fused = []
 
     # Expand gates and fuse where possible
+    all_losses = ones(circuit.register.mds) # for tracking cumulative losses across the circuit, which are commuted to the end of the circuit and can be applied in one step at the end
     for (gate, indices) in circuit.register.builder.ops
         # Expand gate to the full number of modes in the quantum register
         # For instance, this could take a 2x2 beamsplitter matrix and produce a 16x16 (8-mode) qqpp matrix applied to modes 3,5
@@ -48,21 +49,17 @@ function fuse!(circuit::Circuit)
                 push!(circuit.register.builder.ops_fused, gate_expanded)
             end
 
-        # Fuse with previous gate if both gates are loss channels
+        # Collect all losses and apply at the end of the circuit, since losses commute with all gates
         elseif gate_expanded isa LossChannel && !isempty(circuit.register.builder.ops_fused)
-            prev_gate = circuit.register.builder.ops_fused[end]
-            if prev_gate isa LossChannel
-                fused_η = prev_gate.η .* gate_expanded.η # elementwise multiply loss vectors
-                circuit.register.builder.ops_fused[end] = LossChannel(fused_η)
-            else
-                push!(circuit.register.builder.ops_fused, gate_expanded)
-            end
+            all_losses .*= gate_expanded.η # update cumulative losses
 
         # Default: push gate with no fusion
         else
             push!(circuit.register.builder.ops_fused, gate_expanded)
         end
     end
+
+    circuit.register.losses = all_losses
 
     # TODO Future: add more optimizations
 
