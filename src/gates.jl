@@ -1,118 +1,86 @@
 module gates
 
-using Nemo
 using LinearAlgebra
 
-using ..states: GaussianState
-using ..tools: W, k_function_matrix
+using Gabs: QuadBlockBasis, nmodes, GaussianState, GaussianUnitary as GabsGaussianUnitary, beamsplitter as Gabsbeamsplitter
 
-export Gate, num_qubits, SymplecticGate, getTransformMatrix, expand, apply!, apply, BeamSplitter, Squeeze2Mode, ModeSwap, LossChannel
-export ModeProjection, FockProjection, TraceOut, Remaining, Detector, PhotonNumDetector, PhotonThresholdDetector, FormalismTransition, GaussiantoCoherent
+export Gate, GaussianUnitary, modeswap, beamsplitter, LossChannel, Detector, PhotonNumDetector, PhotonThresholdDetector
+export apply!, expand
 
+
+# TODO: make the k-function machinery capable of handling a different basis by responding to what this function specifies
+const default_basis = QuadBlockBasis
 
 abstract type Gate end
-num_qubits(::Gate) = -1 # Any number of qubits
 
-struct SymplecticGate <: Gate
-    S::Matrix{Float64}
+struct GaussianUnitary <: Gate
+    gabs_gate::GabsGaussianUnitary
 end
-num_qubits(::SymplecticGate) = 2
-
-function getTransformMatrix(gate::SymplecticGate, indices::Vector{Int}, mds::Int)::Matrix{Float64}
+convert(::Type{GaussianUnitary}, gabs_gate::GabsGaussianUnitary) = GaussianUnitary(changebasis(default_basis(nmodes(gabs_gate)), gabs_gate))
+apply!(gaussian_state::GaussianState, gate::GaussianUnitary) = gate.gabs_gate * gaussian_state
+function expand(gate::GaussianUnitary, indices::Vector{Int}, mds::Int)
     # Set rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
-    S = Matrix{Float64}(I, 2*mds, 2*mds)
+    S = Matrix{Float64}(I, 2mds, 2mds)
     idx = [indices; (indices .+ mds)]
-    @views S[idx,idx] .= gate.S
-
-    return S
+    @views S[idx,idx] .= gate.gabs_gate.symplectic
+    return GaussianUnitary(GabsGaussianUnitary(default_basis(mds), zeros(2mds), S))
+end
+function Base.:*(gate1::GaussianUnitary, gate2::GaussianUnitary)
+    mds = nmodes(gate1.gabs_gate)
+    GaussianUnitary(GabsGaussianUnitary(default_basis(mds), zeros(2mds), gate1.gabs_gate.symplectic * gate2.gabs_gate.symplectic))
 end
 
-function expand(gate::SymplecticGate, indices::Vector{Int}, mds::Int)::SymplecticGate
-    return SymplecticGate(getTransformMatrix(gate, indices, mds))
-end
-
-function apply!(gate::SymplecticGate, st::GaussianState)
-    st.covariance .= gate.S * st.covariance * gate.S'
-end
-
-# All gates in qqpp representation
-
-BeamSplitter(t::Real=0.5) = SymplecticGate(
-    [
-        √(t)     √(1-t)  0        0      ;
-        -√(1-t)  √(t)    0        0      ;
-        0        0       √(t)     √(1-t) ;
-        0        0       -√(1-t)  √(t)   ;
-    ]
-)
-
-Squeeze2Mode(r::Real, φ::Real=0) = begin
-    coshr = cosh(r)
-    sinhr = sinh(r)
-    cosφ = cos(φ)
-    sinφ = sin(φ)
-    SymplecticGate(
-        1/sqrt(2) * 
+const modeswap = GaussianUnitary(
+    GabsGaussianUnitary(
+        default_basis(2),
+        zeros(2*2),
         [
-            coshr       cosφ*sinhr  0            sinφ*sinhr  ;
-            cosφ*sinhr  coshr       sinφ*sinhr   0           ;
-            0           sinφ*sinhr  coshr        -cosφ*sinhr ;
-            sinφ*sinhr  0           -cosφ*sinhr  coshr       ;
+            0   1   0   0 ;
+            1   0   0   0 ;
+            0   0   0   1 ;
+            0   0   1   0 ;
         ]
     )
-end
-
-ModeSwap() = SymplecticGate(
-    [
-        0   1   0   0 ;
-        1   0   0   0 ;
-        0   0   0   1 ;
-        0   0   1   0 ;
-    ]
 )
 
+beamsplitter(r::Real = 0.5) = GaussianUnitary(
+    Gabsbeamsplitter(
+        default_basis(2),
+        r
+    )
+)
 
-abstract type Channel <: Gate end
-
-struct LossChannel <: Channel
-    η::Vector{Real}
+struct LossChannel <: Gate
+    η::Vector{Float64}
 end
-
-function expand(ch::LossChannel, indices::Vector{Int}, mds::Int)::LossChannel
-    expanded = ones(Float64, mds)
-    if size(ch.η) == (1,)
-        expanded[indices] .= ch.η[1]
+LossChannel(η::Real) = LossChannel([η])
+function expand(gate::LossChannel, indices::Vector{Int}, mds::Int)
+    if length(gate.η) == 1
+        η = ones(mds)
+        η[indices] .= gate.η[1]
     else
-        @assert size(ch.η) == size(indices) "LossChannel η vector must have length equal to number of modes specified, but got length $(size(ch.η)) applied to $(size(indices)) modes"
-        expanded[indices] .= ch.η
+        @assert length(gate.η) == length(indices) "LossChannel has $(length(gate.η)) loss values, but got $(length(indices)) indices"
+        η = ones(mds)
+        η[indices] .= gate.η
     end
-    return LossChannel(expanded)
+    return LossChannel(η)
 end
 
-function apply!(ch::LossChannel, st::GaussianState)
-    η = ch.η                # vector of per-mode transmissivities
-    V = st.covariance
-    mds = length(η)
-    
-    # Build the scaling vector: √ηᵢ for q and p of each mode
-    d = vcat(sqrt.(η), sqrt.(η))   # length 2*mds, matches qqpp ordering
-    
-    # Apply V' = D V Dᵀ with D = diag(d)
-    # This scales entire rows and columns, including off-diagonals
-    V .= (d .* V) .* d'
-    
-    # Add the noise on the self-variance of each attenuated mode
-    for i in 1:mds
-        V[i,     i    ] += (1 - η[i]) / 2    # q-q noise
-        V[i+mds, i+mds] += (1 - η[i]) / 2    # p-p noise
-    end
-    return st
+
+abstract type Detector <: Gate end
+
+struct PhotonNumDetector <: Detector
+    outcomes::Vector{Int}
+end
+function expand(gate::PhotonNumDetector, indices::Vector{Int}, mds::Int)
+    outcomes = -ones(Int, mds)
+    outcomes[indices] .= gate.outcomes
+    return PhotonNumDetector(outcomes)
 end
 
-function LossChannel(η::Real...)
-    @assert all(0 .≤ η .≤ 1) "All loss values must be between 0 and 1"
-    return LossChannel(collect(η))
-end
-
+# TODO: coming soon
+# struct PhotonThresholdDetector <: Detector
+#     outcomes::Vector{Bool}
+# end
 
 end # module

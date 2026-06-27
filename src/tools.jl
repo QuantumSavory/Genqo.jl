@@ -4,7 +4,7 @@ using LinearAlgebra
 using Nemo
 using BlockDiagonals
 
-export wick_out, W, extract_W_terms, permutation_matrix, reorder, k_function_matrix
+export wick_out, W, WTerms, extract_W_terms, permutation_matrix, reorder, k_function_matrix
 
 
 """
@@ -71,7 +71,7 @@ function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{Co
     s = zero(ComplexF64)
     parts = wick_partitions[length(moment)]
     n_parts = size(parts, 1); n_pairs = size(parts, 3)
-    @inbounds for m in 1:n_parts
+    for m in 1:n_parts
         f = one(ComplexF64)
         for n in 1:n_pairs
             i = parts[m, 1, n]; j = parts[m, 2, n]
@@ -214,7 +214,7 @@ W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
     n_parts = size(parts, 1)
     n_pairs = N ÷ 2
     s = zero(ComplexF64)
-    @inbounds for x in eachindex(b.coeffs)
+    for x in eachindex(b.coeffs)
         m = b.indices[x]                    # NTuple{N,Int}, stack-resident
         f = zero(ComplexF64)
         for k in 1:n_parts
@@ -311,7 +311,7 @@ function k_function_matrix(covariance::Matrix{Float64})::Matrix{ComplexF64}
     # Build BB (16×16 ComplexF64) without intermediates
     BB = Matrix{ComplexF64}(undef, n, n)
 
-    @inbounds for j in 1:sz, i in 1:sz
+    for j in 1:sz, i in 1:sz
         a  = A[i,j]
         b  = B[i,j]
         c  = C[i,j]
@@ -330,7 +330,7 @@ function k_function_matrix(covariance::Matrix{Float64})::Matrix{ComplexF64}
 
     # Return block diagonal [BB, conj(BB)] as a plain 32×32 matrix
     K = zeros(ComplexF64, 2n, 2n)
-    @inbounds for j in 1:n, i in 1:n
+    for j in 1:n, i in 1:n
         v = BB[i,j]
         K[i,   j  ] = v
         K[i+n, j+n] = conj(v)

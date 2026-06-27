@@ -1,9 +1,9 @@
 using Genqo
 using Gabs: eprstate, QuadBlockBasis, ⊗
 
+using BenchmarkTools
 using Plots
 
-## ZALM Probability of Success
 
 # Create empty circuit
 q = QCircuit(8)
@@ -18,7 +18,7 @@ beamsplitter() | q[4,6]
 
 # Incorporate losses
 ηᵗ = 1.0
-ηᵈ = 0.3
+ηᵈ = 0.8
 LossChannel(ηᵗ) | q[1,2,7,8]
 LossChannel(ηᵈ) | q[3,4,5,6] # TODO: allow 3:6
 
@@ -32,18 +32,10 @@ function zalm_probability(μ::Float64)::Float64
     # Initialize TMSV states
     # TODO: is there a slicker way to parametrize any part of the circuit? Like losses, transmissivities, etc? Maybe symbolics would help?
     tmsv = eprstate(QuadBlockBasis(2), asinh(√μ), 0.)
-    run!(
-        engine,
-        q_fused, 
-        tmsv ⊗ tmsv ⊗ tmsv ⊗ tmsv
-    )
+    run!(engine, q_fused, tmsv⊗tmsv⊗tmsv⊗tmsv)
 end
 
-μ = logrange(1e-4, 10, 100)
-# η = 10 .^ -([0, 1, 3, 5]/10)
+μ = logrange(1e-4, 1e2, 100)
+@time P = zalm_probability.(μ)
 
-zalm_Pg_ground = zalm.probability_success.(μ, 1, 1, ηᵈ, 0)
-zalm_Pg_new = zalm_probability.(μ)
-
-plot(μ, zalm_Pg_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=[1 2 3 4])
-plot!(μ, zalm_Pg_new, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
+plot(μ, P, xscale=:log10, yscale=:log10)

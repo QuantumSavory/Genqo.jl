@@ -1,93 +1,87 @@
 module circuits
 
+using Nemo
+using LinearAlgebra
+
 using ..gates
-using ..registers
-using ..metrics
-using ..metrics: ComputeStep
-using ..detectors
 
-export Circuit, fuse, fuse!, run
+export AbstractQCircuit, QCircuit, FusedQCircuit, HeraldedGaussianCircuit
+export fuse
 
 
-mutable struct Circuit
-    register::QuantumRegister
-end
-Circuit(mds::Int) = Circuit(QuantumRegister(mds))
+abstract type AbstractQCircuit end
 
-function fuse(circuit::Circuit)::Circuit
-    if circuit.register.builder.fused
-        return circuit
-    end
-    _circuit = deepcopy(circuit)
-    fuse!(_circuit)
+mutable struct QCircuit <: AbstractQCircuit
+    mds::Int
+    gates::Vector{Gate}
 
-    return _circuit
+    QCircuit(mds::Int) = new(mds, [])
 end
 
-function fuse!(circuit::Circuit)
-    # Skip if already marked as fused
-    if circuit.register.builder.fused return end
+struct ModeRef{T<:AbstractQCircuit}
+    circuit::Ref{T}
+    indices::Vector{Int}
+end
 
-    # Clear fused ops cache before re-fusing
-    circuit.register.builder.ops_fused = []
+# Support indexing. Syntax: q[1], q[2,3]
+Base.getindex(circuit::AbstractQCircuit, i::Int) = ModeRef(Ref(circuit), [i])
+Base.getindex(circuit::AbstractQCircuit, is::Int...) = ModeRef(Ref(circuit), collect(is))
+
+# Support applying a gate to modes. Syntax: gate(...) | q[1,3]
+function Base.:(|)(gate::Gate, modes::ModeRef)
+    # Expand gate to the full number of modes in the quantum register
+    # For instance, this could take a 2x2 beamsplitter matrix and produce a 16x16 (8-mode) qqpp matrix applied to modes 3,5
+    push!(modes.circuit[].gates, expand(gate, modes.indices, modes.circuit[].mds)) # Push expanded gate to the circuit
+end
+
+
+abstract type FusedQCircuit <: AbstractQCircuit end
+
+struct HeraldedGaussianCircuit <: FusedQCircuit
+    mds::Int
+    gates::Vector{GaussianUnitary}
+    losses::Vector{Float64}
+    detectors::Detector
+end
+
+# TODO Future: allow fuser to choose which kind of FusedQCircuit to make, depending on the circuit layout and available engines
+# For right now, this only ever fuses into HeraldedGaussianCircuit
+function fuse(circuit::QCircuit)::FusedQCircuit
+    gates = []
+    detectors = nothing
+
+    # TODO: eventually we want to check that the circuit can be decomposed into A and B, where A is a Gaussian circuit and B is a circuit of Fock measurements and losses. For now we expect gates to come in the order of Gaussian gates followed by losses followed by measurements.
 
     # Expand gates and fuse where possible
-    all_losses = ones(circuit.register.mds) # for tracking cumulative losses across the circuit, which are commuted to the end of the circuit and can be applied in one step at the end
-    for (gate, indices) in circuit.register.builder.ops
-        # Expand gate to the full number of modes in the quantum register
-        # For instance, this could take a 2x2 beamsplitter matrix and produce a 16x16 (8-mode) qqpp matrix applied to modes 3,5
-        gate_expanded = expand(gate, indices, circuit.register.mds)
-
+    losses = ones(circuit.mds)
+    for gate in circuit.gates
         # Fusion rules
-        # Fuse with previous gate if both gates are symplectic
-        if gate_expanded isa SymplecticGate && !isempty(circuit.register.builder.ops_fused)
-            prev_gate = circuit.register.builder.ops_fused[end]
-            if prev_gate isa SymplecticGate
-                fused_S = gate_expanded.S * prev_gate.S # left-multiply by new gate
-                circuit.register.builder.ops_fused[end] = SymplecticGate(fused_S)
+        # Fuse with previous gate if both gates are GaussianUnitary
+        if gate isa GaussianUnitary && !isempty(gates)
+            prev_gate = gates[end]
+            if prev_gate isa GaussianUnitary
+                gates[end] = gate * prev_gate # left-multiply by new gate
             else
-                push!(circuit.register.builder.ops_fused, gate_expanded)
+                push!(gates, gate)
             end
 
         # Collect all losses and apply at the end of the circuit, since losses commute with all gates
-        elseif gate_expanded isa LossChannel && !isempty(circuit.register.builder.ops_fused)
-            all_losses .*= gate_expanded.η # update cumulative losses
+        # TODO: this can't be right. Losses need to go through the gates that come after them
+        elseif gate isa LossChannel
+            losses .*= gate.η # update cumulative losses
+
+        elseif gate isa Detector
+            detectors = gate
 
         # Default: push gate with no fusion
         else
-            push!(circuit.register.builder.ops_fused, gate_expanded)
+            push!(gates, gate)
         end
     end
 
-    circuit.register.losses = all_losses
-
     # TODO Future: add more optimizations
-
-    circuit.register.builder.fused = true
-    return
+    
+    return HeraldedGaussianCircuit(circuit.mds, gates, losses, detectors)
 end
-
-function run!(circuit::Circuit)
-    # Run fuser to expand gates and optimize circuit
-    fuse!(circuit)
-
-    # Apply gates in order
-    for gate in circuit.register.builder.ops_fused
-        apply!(gate, circuit.register.state)
-    end
-end
-
-function analyze!(circuit::Circuit, metrics::Vector{<:Metric})::Dict{<:Metric, Any}
-    run!(circuit)
-
-    # Compute each metric, caching intermediate results as needed for efficiency
-    results = Dict{Metric, Any}()
-    cache = Dict{ComputeStep, Any}()
-    for metric in metrics
-        results[metric] = compute!(metric, circuit.register, cache)
-    end
-    return results
-end
-analyze!(circuit::Circuit, metric::Metric) = analyze!(circuit, [metric])[metric]
 
 end # module
