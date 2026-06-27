@@ -50,7 +50,7 @@ mutable struct HybridGaussianCoherentEngine <: AbstractEngine
     end
 end
 
-function run!(engine::AbstractEngine, circuit::QCircuit)
+function run!(engine::AbstractEngine, circuit::FusedQCircuit)
     error("run! not implemented for engine of type $(typeof(engine)) on circuit of type $(typeof(circuit))")
 end
 
@@ -60,7 +60,7 @@ function run!(engine::HybridGaussianCoherentEngine, circuit::HeraldedGaussianCir
     # Apply fused gates in order
     engine.gaussian_state = initial_state
     for gate in circuit.gates
-        engine.gaussian_state = apply!(engine.gaussian_state, gate)
+        apply!(engine.gaussian_state, gate)
     end
 
     # Convert to K-function representation and compute probabilities.

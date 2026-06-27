@@ -17,7 +17,7 @@ struct GaussianUnitary <: Gate
     gabs_gate::GabsGaussianUnitary
 end
 convert(::Type{GaussianUnitary}, gabs_gate::GabsGaussianUnitary) = GaussianUnitary(changebasis(default_basis(nmodes(gabs_gate)), gabs_gate))
-apply!(gaussian_state::GaussianState, gate::GaussianUnitary) = gate.gabs_gate * gaussian_state
+apply!(gaussian_state::GaussianState, gate::GaussianUnitary) = apply!(gaussian_state, gate.gabs_gate)
 function expand(gate::GaussianUnitary, indices::Vector{Int}, mds::Int)
     # Set rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
     S = Matrix{Float64}(I, 2mds, 2mds)
