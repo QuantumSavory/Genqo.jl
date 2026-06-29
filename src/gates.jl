@@ -2,10 +2,10 @@ module gates
 
 using LinearAlgebra
 
-using Gabs: QuadBlockBasis, nmodes, GaussianState, GaussianUnitary as GabsGaussianUnitary, beamsplitter as Gabsbeamsplitter
+using Gabs: Gabs, SymplecticBasis, QuadBlockBasis, nmodes, GaussianState, GaussianUnitary, embed
 
-export Gate, GaussianUnitary, modeswap, beamsplitter, LossChannel, Detector, PhotonNumDetector, PhotonThresholdDetector
-export apply!, expand
+export Gate, WrappedGaussianUnitary, modeswap, LossChannel, Detector, PhotonNumDetector, PhotonThresholdDetector
+export apply!
 
 
 # TODO: make the k-function machinery capable of handling a different basis by responding to what this function specifies
@@ -13,58 +13,32 @@ const default_basis = QuadBlockBasis
 
 abstract type Gate end
 
-struct GaussianUnitary <: Gate
-    gabs_gate::GabsGaussianUnitary
+struct WrappedGaussianUnitary <: Gate
+    gate::GaussianUnitary
 end
-convert(::Type{GaussianUnitary}, gabs_gate::GabsGaussianUnitary) = GaussianUnitary(changebasis(default_basis(nmodes(gabs_gate)), gabs_gate))
-apply!(gaussian_state::GaussianState, gate::GaussianUnitary) = apply!(gaussian_state, gate.gabs_gate)
-function expand(gate::GaussianUnitary, indices::Vector{Int}, mds::Int)
-    # Set rows/columns corresponding to qi, pi, qj, pj using row/column 1, 2, 3, 4 from `gate`. qqpp ordering.
-    S = Matrix{Float64}(I, 2mds, 2mds)
-    idx = [indices; (indices .+ mds)]
-    @views S[idx,idx] .= gate.gabs_gate.symplectic
-    return GaussianUnitary(GabsGaussianUnitary(default_basis(mds), zeros(2mds), S))
-end
+Base.convert(::Type{WrappedGaussianUnitary}, gate::GaussianUnitary) = WrappedGaussianUnitary(gate)
+Base.convert(::Type{GaussianUnitary}, gate::WrappedGaussianUnitary) = gate.gate
+apply!(state::GaussianState, gate::WrappedGaussianUnitary, indices::Vector{Int}) = Gabs.apply!(state, gate.gate, indices)
 function Base.:*(gate1::GaussianUnitary, gate2::GaussianUnitary)
     mds = nmodes(gate1.gabs_gate)
-    GaussianUnitary(GabsGaussianUnitary(default_basis(mds), zeros(2mds), gate1.gabs_gate.symplectic * gate2.gabs_gate.symplectic))
+    GaussianUnitary(default_basis(mds), zeros(2mds), gate1.symplectic * gate2.symplectic)
 end
 
-const modeswap = GaussianUnitary(
-    GabsGaussianUnitary(
-        default_basis(2),
-        zeros(2*2),
-        [
-            0   1   0   0 ;
-            1   0   0   0 ;
-            0   0   0   1 ;
-            0   0   1   0 ;
-        ]
-    )
-)
-
-beamsplitter(r::Real = 0.5) = GaussianUnitary(
-    Gabsbeamsplitter(
-        default_basis(2),
-        r
-    )
+modeswap(basis::SymplecticBasis) = GaussianUnitary(
+    basis,
+    zeros(2*2),
+    [
+        0   1   0   0 ;
+        1   0   0   0 ;
+        0   0   0   1 ;
+        0   0   1   0 ;
+    ]
 )
 
 struct LossChannel <: Gate
     η::Vector{Float64}
 end
 LossChannel(η::Real) = LossChannel([η])
-function expand(gate::LossChannel, indices::Vector{Int}, mds::Int)
-    if length(gate.η) == 1
-        η = ones(mds)
-        η[indices] .= gate.η[1]
-    else
-        @assert length(gate.η) == length(indices) "LossChannel has $(length(gate.η)) loss values, but got $(length(indices)) indices"
-        η = ones(mds)
-        η[indices] .= gate.η
-    end
-    return LossChannel(η)
-end
 
 
 abstract type Detector <: Gate end

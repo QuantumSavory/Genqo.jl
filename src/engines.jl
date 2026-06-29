@@ -2,7 +2,7 @@ module engines
 
 using Nemo
 using LinearAlgebra
-using Gabs: GaussianState, vacuumstate, changebasis
+using Gabs: GaussianState, vacuumstate, QuadBlockBasis, changebasis
 
 using ..circuits
 using ..gates
@@ -59,14 +59,14 @@ function run!(engine::HybridGaussianCoherentEngine, circuit::HeraldedGaussianCir
 
     # Apply fused gates in order
     engine.gaussian_state = initial_state
-    for gate in circuit.gates
-        apply!(engine.gaussian_state, gate)
+    for (gate, indices) in circuit.gates
+        apply!(engine.gaussian_state, gate, indices)
     end
 
     # Convert to K-function representation and compute probabilities.
     # Gabs uses the ħ=2 convention (vacuum variance 1), but the K-function machinery
     # assumes ħ=1 (vacuum variance 1/2, hence the `Γ = σ + ½I` below), so rescale by 1/ħ.
-    gstate = changebasis(default_basis, engine.gaussian_state)
+    gstate = changebasis(QuadBlockBasis, engine.gaussian_state)
     σ = gstate.covar ./ gstate.ħ
     A = k_function_matrix(σ) + G_matrix(circuit.losses, circuit.detectors, circuit.mds)
 
