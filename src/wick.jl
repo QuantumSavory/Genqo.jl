@@ -5,6 +5,7 @@ using BlockDiagonals
 export wick_out, W, WTerms, extract_W_terms
 
 
+# TODO: explore implementing the recursive matching algorithm directly in W() instead of precomputing all partitions
 """
 Precompute Wick partitions (perfect pairings) of 1:n
 Each partition is a Vector of (i, j) pairs (as Tuples)
@@ -46,7 +47,7 @@ function _wick_partitions(N::Int)::Array{Int, 3}
     @assert idx == n_parts + 1 "Expected to fill all $n_parts partitions, but filled $(idx-1)"
     return result
 end
-const wick_partitions = Dict(N => _wick_partitions(N) for N in (0, 2, 4, 6, 8)) # Precompute for N=0,2,4,6,8
+const wick_partitions = Dict(N => _wick_partitions(N) for N in 0:2:12) # Precompute partitions for small N
 
 """
     wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
@@ -65,9 +66,12 @@ entries of `Ainv` and accumulates the result, then scales by `coef`.
 `coef` times the sum of all Wick-contraction products for this monomial.
 """
 function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{ComplexF64})::ComplexF64
+    N = length(moment)
+    iseven(N) || return 0 # monomial with odd number of variables has no PMP set
+
     # Iterate over Wick partitions
     s = zero(ComplexF64)
-    parts = wick_partitions[length(moment)]
+    parts = wick_partitions[N]
     n_parts = size(parts, 1); n_pairs = size(parts, 3)
     for m in 1:n_parts
         f = one(ComplexF64)

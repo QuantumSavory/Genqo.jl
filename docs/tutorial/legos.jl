@@ -35,14 +35,17 @@ function zalm_metrics(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridP
         return F
     end
 
-    # ρ_photon = to_fock(st_heralded; cutoff=4) # user explicitly converts to fock basis and specifies cutoff
+    ρ_photon = to_fock(st_heralded; cutoff=1) # user explicitly converts to fock basis and specifies cutoff
+    if metric == :ρ_photon
+        return ρ_photon
+    end
 
     # memory = DuanKimble()
     # st_loaded = load_state(st_heralded, memory)
     # ρ_spin = 
 
     if metric == :all
-        return (Pgen=Pgen, F=F)
+        return (Pgen=Pgen, F=F, ρ_photon=ρ_photon)
     end
 end
 

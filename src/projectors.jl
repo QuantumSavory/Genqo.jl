@@ -1,12 +1,14 @@
 using Nemo
 using LinearAlgebra
+import LinearAlgebra: tr, dot
 using Gabs
+using QuantumOpticsBase
 
 export
     # Types
     AbstractClickState, ClickStateKet, ClickStateBra, AbstractProjector, HybridProjector, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
     # Functions
-    clicks, project, tr, dot, fidelity
+    clicks, project, tr, dot, fidelity, to_fock
 
 
 abstract type AbstractClickState end
@@ -196,6 +198,27 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
 end
 fidelity(st::ClickStateKet, projected_state::ProjectedPureGaussianState) = dot(st', projected_state, st) / tr(projected_state)
+
+"""
+Computes the unnormalized Fock-basis photon-photon density matrix of a projected pure Gaussian state
+"""
+function to_fock(projected_state::ProjectedPureGaussianState; cutoff::Int=2)::Operator
+    detector_outcomes = projected_state.detector_outcomes
+    m = count(detector_outcomes .== -1) # Number of modes to include in the resulting density matrix
+    basis = reduce(⊗, FockBasis(cutoff) for _ in 1:m) # (cutoff+1)^m-dimensional Hilbert space for the density matrix
+
+    sz = length(basis)
+    dm = Operator(basis, Matrix{ComplexF64}(undef, sz, sz))
+
+    # TODO: check that the ordering given by the iterator matches QuantumOpticsBase's ordering in the density matrix
+    inds = Iterators.product(repeat([0:cutoff], m)...)
+    for (i, bcl) in enumerate(inds), (j, kcl) in enumerate(inds)
+        bra = clicks(collect(bcl))'; ket = clicks(collect(kcl))
+        dm.data[i, j] = dot(bra, projected_state, ket)
+    end
+
+    dm
+end
 
 
 function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, detector_outcomes::Vector{Int}; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Matrix{Float64}}
