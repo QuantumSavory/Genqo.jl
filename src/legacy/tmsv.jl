@@ -4,6 +4,7 @@ using Nemo
 using LinearAlgebra
 
 using ..tools
+using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """

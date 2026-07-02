@@ -6,6 +6,7 @@ using LinearAlgebra
 
 import ..tmsv
 using ..tools
+using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """

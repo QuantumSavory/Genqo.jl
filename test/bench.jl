@@ -1,4 +1,5 @@
 using Genqo
+using Genqo: _wick_partitions
 using BenchmarkTools
 
 # Get optional function filter and output directory from command line arguments
@@ -110,7 +111,7 @@ function _wick_partitions_old(n::Int)
 end
 
 for N in (2, 4, 6, 8)
-    SUITE["pmp.new.N=$N"] = @benchmarkable tools._wick_partitions($N)
+    SUITE["pmp.new.N=$N"] = @benchmarkable _wick_partitions($N)
     SUITE["pmp.old.N=$N"] = @benchmarkable _wick_partitions_old($N)
 end
 

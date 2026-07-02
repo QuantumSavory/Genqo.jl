@@ -2,8 +2,6 @@ using Nemo
 using LinearAlgebra
 using Gabs
 
-using ..tools
-
 export
     # Types
     AbstractClickState, ClickStateKet, ClickStateBra, AbstractProjector, HybridProjector, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
@@ -27,6 +25,7 @@ function Base.show(io::IO, cs::ClickStateKet)
     print(io, join(["\n($cf)|$(join(cl, ","))⟩" for (cf, cl) in zip(cs.coefs, eachrow(cs.clicks))], " + "))
 end
 Base.:(==)(a::ClickStateKet, b::ClickStateKet) = a.clicks == b.clicks && a.coefs == b.coefs
+Base.isapprox(a::ClickStateKet, b::ClickStateKet; kwargs...) = a.clicks == b.clicks && isapprox(a.coefs, b.coefs; kwargs...)
 Base.:+(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
 Base.:-(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
 Base.:*(a::ComplexF64, b::ClickStateKet) = ClickStateKet(a .* b.coefs, b.clicks)
@@ -50,6 +49,7 @@ function Base.show(io::IO, cs::ClickStateBra)
     print(io, join(["\n($cf)⟨$(join(cl, ","))|" for (cf, cl) in zip(cs.coefs, eachrow(cs.clicks))], " + "))
 end
 Base.:(==)(a::ClickStateBra, b::ClickStateBra) = a.clicks == b.clicks && a.coefs == b.coefs
+Base.isapprox(a::ClickStateBra, b::ClickStateBra; kwargs...) = a.clicks == b.clicks && isapprox(a.coefs, b.coefs; kwargs...)
 Base.:+(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
 Base.:-(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
 Base.:*(a::ComplexF64, b::ClickStateBra) = ClickStateBra(a .* b.coefs, b.clicks)
@@ -79,7 +79,7 @@ mutable struct HybridProjector <: AbstractProjector
     β::Vector{Generic.MPoly{ComplexFieldElem}}
 
     # Cache for C polynomials
-    C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Float64}}, WTerms}
+    C_poly_cache::Dict{Vector{Float64}, WTerms}
 
     function HybridProjector(mds::Int)
         # Define canonical phase-space variables for the circuit
@@ -137,7 +137,10 @@ Computes the probability of success for a given projected pure Gaussian state.
 function tr(projected_state::ProjectedPureGaussianState)::Float64
     st = projected_state.st
     proj = projected_state.proj
+    α = proj.α
+    β = proj.β
     detector_outcomes = projected_state.detector_outcomes
+    detector_outcomes_notraceout = max.(detector_outcomes, 0) # Filter out -1 (traceout) modes
     η = projected_state.η
 
     # Convert to K-function representation and compute probabilities.
@@ -147,10 +150,17 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     A, Γ = A_matrix(σ, η, detector_outcomes; traceout=true)
 
     invA, detA = inv(A), det(A)
-    C = C_poly(proj, detector_outcomes, η)
     detΓ = det(Γ)
+    ηweight = prod(η .^ detector_outcomes_notraceout) # √η per detected photon, matching dot()'s per-click η factor
 
-    Pgen = W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+    C = get!(proj.C_poly_cache, detector_outcomes) do
+        # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
+        # tools.W() will need to be generalized
+        C = prod((α .* β) .^ detector_outcomes_notraceout)
+        extract_W_terms(C)
+    end
+
+    Pgen = W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
     @assert isreal(Pgen) "Probability of success should be real, but got $Pgen"
     real(Pgen)
 end
@@ -158,10 +168,11 @@ end
 function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet)::ComplexF64 # TODO: is this the right return type?
     st = projected_state.st
     η = projected_state.η
-    R = projected_state.proj.R
-    CC = projected_state.proj.CC
-    α = projected_state.proj.α
-    β = projected_state.proj.β
+    proj = projected_state.proj
+    R = proj.R
+    CC = proj.CC
+    α = proj.α
+    β = proj.β
     detector_outcomes = projected_state.detector_outcomes
     count(detector_outcomes .== -1) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
 
@@ -172,6 +183,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     invA, detA = inv(A), det(A)
     detΓ = det(Γ)
 
+    # TODO: get! from C_poly_cache
     C = zero(R)
     for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
         bcl_full, kcl_full = copy(detector_outcomes), copy(detector_outcomes)
@@ -234,20 +246,4 @@ function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, detector_outcomes::V
         end
     end
     (G, Γ)
-end
-
-function C_poly(proj::HybridProjector, detector_outcomes::Vector{Int}, η::Vector{Float64})::WTerms
-    get!(proj.C_poly_cache, (detector_outcomes, η)) do
-        C = one(proj.R)
-        for (ni, ηi, αi, βi) in zip(detector_outcomes, η, proj.α, proj.β)
-            if ni == 1
-                C *= (αi * βi * ηi)
-            # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
-            # tools.W() will need to be generalized
-            elseif ni > 1
-                C *= (αi * βi * ηi)^ni / factorial(ni)
-            end
-        end
-        extract_W_terms(C)
-    end
 end
