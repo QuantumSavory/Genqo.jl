@@ -75,7 +75,7 @@ SUITE["sigsag.fidelity"]               = @benchmarkable sigsag.fidelity(s)      
 # once. The new algorithm (tools._wick_partitions) builds pairings recursively, only
 # emitting valid perfect matchings.
 function _wick_partitions_old(n::Int)
-    @assert iseven(n) "n must be even"
+    iseven(n) || throw(ArgumentError("n must be even"))
     all_partitions = Vector{Vector{Tuple{Int,Int}}}()
 
     # Mimic itertools.combinations(range(n), 2)

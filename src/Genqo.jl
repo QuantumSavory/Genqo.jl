@@ -1,7 +1,5 @@
 module Genqo
 
-using Reexport
-
 include("tools.jl")
 include("legacy/tmsv.jl")
 include("legacy/spdc.jl")
@@ -16,12 +14,7 @@ import .sigsag
 
 export tools, tmsv, spdc, zalm, sigsag
 
-include("gates.jl")
-include("circuits.jl")
-include("engines.jl")
-
-@reexport using .gates
-@reexport using .circuits
-@reexport using .engines
+include("unitaries.jl")
+include("projectors.jl")
 
 end # module

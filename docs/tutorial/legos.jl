@@ -1,42 +1,83 @@
 using Genqo
-using Gabs: eprstate, QuadBlockBasis, ⊗, beamsplitter
+using Gabs
 
 using BenchmarkTools
 using Plots
 
 
-# Create empty circuit
-q = QCircuit(8)
-basis = QuadBlockBasis(2)
+## ZALM calculations
 
-# Apply mode swaps
-modeswap(basis) | q[2,4]
-modeswap(basis) | q[5,7]
+function zalm_metrics(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector, metric::Symbol=:none)
+    basis = QuadBlockBasis(2)
+    tmsv = eprstate(basis, asinh(√μ), 0.)
+    st = reduce(⊗, tmsv for _ in 1:4)
+    ms = modeswap(basis)
+    bs = beamsplitter(basis, 0.5)
 
-# Apply beamsplitters
-beamsplitter(basis, 0.5) | q[3,5]
-beamsplitter(basis, 0.5) | q[4,6]
+    apply!(st, ms, [2,4])
+    apply!(st, ms, [5,7])
+    apply!(st, bs, [3,5])
+    apply!(st, bs, [4,6])
 
-# Incorporate losses
-ηᵗ = 1.0
-ηᵈ = 0.8
-LossChannel(ηᵗ) | q[1,2,7,8]
-LossChannel(ηᵈ) | q[3:6]
+    η = [ηᵗ,ηᵗ,ηᵈ,ηᵈ,ηᵈ,ηᵈ,ηᵗ,ηᵗ]
+    st_heralded = project(st, proj, [:,:,1,1,0,0,:,:]; η=η) # of some intermediate type just containing detection/loss/Gaussian state information, but not converted to a density matrix yet
 
-# Heralding detection
-PhotonNumDetector([1,1,0,0]) | q[3:6]
+    # Probability of success
+    Pgen = tr(st_heralded) # shortcuts density matrix calculation
+    if metric == :Pgen
+        return Pgen
+    end
 
-q_fused = fuse(q)
-engine = HybridGaussianCoherentEngine(8)
+    # Fidelity
+    ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+    F = real(dot(ψ⁺', st_heralded, ψ⁺)) / Pgen # also shortcuts density matrix calculation
+    if metric == :F
+        return F
+    end
 
-function zalm_probability(μ::Float64; q_fused::FusedQCircuit, engine::AbstractEngine)::Float64
-    # Initialize TMSV states
-    # TODO: is there a slicker way to parametrize any part of the circuit? Like losses, transmissivities, etc? Maybe symbolics would help?
-    tmsv = eprstate(QuadBlockBasis(2), asinh(√μ), 0.)
-    run!(engine, q_fused, tmsv ⊗ tmsv ⊗ tmsv ⊗ tmsv)
+    # ρ_photon = to_fock(st_heralded; cutoff=4) # user explicitly converts to fock basis and specifies cutoff
+
+    # memory = DuanKimble()
+    # st_loaded = load_state(st_heralded, memory)
+    # ρ_spin = 
+
+    if metric == :all
+        return (Pgen=Pgen, F=F)
+    end
 end
 
-μ = logrange(1e-4, 1e2, 100)
-P = @btime zalm_probability.(μ; q_fused, engine)
+function benchmark_zalm()
+    proj = HybridProjector(8)
+    μ = logrange(1e-4, 1e2, 100)
+    ηᵗ = 1.0
+    ηᵈ = 0.8
+    @btime zalm_metrics.($μ, $ηᵗ, $ηᵈ; proj=$proj)
+end
+benchmark_zalm()
 
-plot(μ, P, xscale=:log10, yscale=:log10)
+## Verify v2 matches v1
+
+function verify_zalm_Pgen()
+    μ = logrange(1e-4, 10, 100)
+    η = 10 .^ -([0, 3, 6, 9]/10)
+    proj = HybridProjector(8)
+
+    zalm_Pg_ground = zalm.probability_success.(μ, η', 1, η', 0)
+    zalm_Pg_new = zalm_metrics.(μ, η', η'; proj=proj, metric=:Pgen)
+
+    plot(μ, zalm_Pg_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=[1 2 3 4])
+    plot!(μ, zalm_Pg_new, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
+end
+verify_zalm_Pgen()
+
+function verify_zalm_F()
+    μ = logrange(1e-4, 10, 100)
+    η = 10 .^ -([0, 3, 6, 9]/10)
+    proj = HybridProjector(8)
+
+    zalm_F_ground = zalm.fidelity.(μ, η', 1, η')
+    zalm_F_new = zalm_metrics.(μ, η', η'; proj=proj, metric=:F)
+    plot(μ, zalm_F_ground, label="Genqo v1 (ground truth)", xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])
+    plot!(μ, zalm_F_new, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
+end
+verify_zalm_F()

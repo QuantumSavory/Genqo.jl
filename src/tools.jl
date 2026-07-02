@@ -12,7 +12,7 @@ Precompute Wick partitions (perfect pairings) of 1:n
 Each partition is a Vector of (i, j) pairs (as Tuples)
 """
 function _wick_partitions(N::Int)::Array{Int, 3}
-    @assert iseven(N) "N must be even"
+    iseven(N) || throw(ArgumentError("N must be even"))
 
     n_parts = prod(1:2:(N-1)) # number of perfect matchings of n elements
 
@@ -293,50 +293,23 @@ arrays and reuses an LU factorization for Γ⁻¹.
 A `ComplexF64` matrix `K` (block diagonal `[BB, conj(BB)]`) suitable for `A = K + loss_matrix`.
 """
 function k_function_matrix(covariance::Matrix{Float64})::Matrix{ComplexF64}
-    Γ = covariance + (1/2)*I
+    mds = size(covariance, 1) ÷ 2
+    Γ = covariance + 0.5*I
+    Γinv = inv(Γ)
 
-    # Invert Γ via LU (same numerical result as inv(Γ), but lets us reuse LU storage)
-    F = lu!(Γ)            # factors in-place
-    Γinv = inv(F)         # 16×16 Float64
+    # Views of Γinv blocks
+    A  = @view Γinv[1:mds,      1:mds     ]
+    C  = @view Γinv[1:mds,      mds+1:2mds]
+    Cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
+    B  = @view Γinv[mds+1:2mds, mds+1:2mds]
 
-    sz = size(Γinv, 1) ÷ 2
-    n = 2sz
-
-    # Views of Γinv blocks (Float64)
-    A  = @view Γinv[1:sz,    1:sz]
-    C  = @view Γinv[1:sz,    sz+1:n]
-    Cᵀ = @view Γinv[sz+1:n,  1:sz]
-    B  = @view Γinv[sz+1:n,  sz+1:n]
-
-    # Build BB (16×16 ComplexF64) without intermediates
-    BB = Matrix{ComplexF64}(undef, n, n)
-
-    for j in 1:sz, i in 1:sz
-        a  = A[i,j]
-        b  = B[i,j]
-        c  = C[i,j]
-        ct = Cᵀ[i,j]
-
-        # handy subexpressions
-        csum = c + ct
-        abd  = a - b
-
-        # BB block entries (each multiplied by 1/2 overall)
-        BB[i,     j     ] = 0.5*a  + (im/4)*csum  # (1/2)*(A  + (i/2)(C+Ct))
-        BB[i,     j+sz  ] = 0.5*c  - (im/4)*abd   # (1/2)*(C  - (i/2)(A-B))
-        BB[i+sz,  j     ] = 0.5*ct - (im/4)*abd   # (1/2)*(Ct - (i/2)(A-B))
-        BB[i+sz,  j+sz  ] = 0.5*b  - (im/4)*csum  # (1/2)*(B  - (i/2)(C+Ct))
-    end
-
-    # Return block diagonal [BB, conj(BB)] as a plain 32×32 matrix
-    K = zeros(ComplexF64, 2n, 2n)
-    for j in 1:n, i in 1:n
-        v = BB[i,j]
-        K[i,   j  ] = v
-        K[i+n, j+n] = conj(v)
-    end
-
-    return K
+    K = zeros(ComplexF64, 4mds, 4mds)
+    @views @. K[1:mds,      1:mds     ] = 0.5*A  + (0.25im)*(C + Cᵀ)
+    @views @. K[1:mds,      mds+1:2mds] = 0.5*C  - (0.25im)*(A - B)
+    @views @. K[mds+1:2mds, 1:mds     ] = 0.5*Cᵀ - (0.25im)*(A - B)
+    @views @. K[mds+1:2mds, mds+1:2mds] = 0.5*B  - (0.25im)*(C + Cᵀ)
+    @views @. K[2mds+1:4mds, 2mds+1:4mds] = conj(K[1:2mds, 1:2mds])
+    K
 end
 
 end # module

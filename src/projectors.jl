@@ -1,0 +1,253 @@
+using Nemo
+using LinearAlgebra
+using Gabs
+
+using ..tools
+
+export
+    # Types
+    AbstractClickState, ClickStateKet, ClickStateBra, AbstractProjector, HybridProjector, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
+    # Functions
+    clicks, project, tr, dot, fidelity
+
+
+abstract type AbstractClickState end
+
+struct ClickStateKet <: AbstractClickState
+    coefs::Vector{ComplexF64}
+    clicks::Array{Int,2}
+    function ClickStateKet(coefs::Vector{ComplexF64}, clicks::Array{Int,2})
+        length(coefs) == size(clicks, 1) || throw(ArgumentError("Length of coefficients must match number of click patterns"))
+        new(coefs, clicks)
+    end
+end
+clicks(clicks::Vector{Int}) = ClickStateKet([one(ComplexF64)], reshape(clicks, 1, :))
+function Base.show(io::IO, cs::ClickStateKet)
+    Base.summary(io, cs)
+    print(io, join(["\n($cf)|$(join(cl, ","))⟩" for (cf, cl) in zip(cs.coefs, eachrow(cs.clicks))], " + "))
+end
+Base.:(==)(a::ClickStateKet, b::ClickStateKet) = a.clicks == b.clicks && a.coefs == b.coefs
+Base.:+(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
+Base.:-(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
+Base.:*(a::ComplexF64, b::ClickStateKet) = ClickStateKet(a .* b.coefs, b.clicks)
+Base.:*(a::Complex{Bool}, b::ClickStateKet) = ClickStateKet(a .* b.coefs, b.clicks)
+Base.:*(a::ClickStateKet, b::Number) = ClickStateKet(a.coefs .* b, a.clicks)
+Base.:*(a::ClickStateKet, b::Complex{Bool}) = ClickStateKet(a.coefs .* b, a.clicks)
+Base.:/(a::ClickStateKet, b::Number) = ClickStateKet(a.coefs ./ b, a.clicks)
+Base.adjoint(a::ClickStateKet) = ClickStateBra(conj(a.coefs), a.clicks)
+nmodes(cs::ClickStateKet) = size(cs.clicks, 2)
+
+struct ClickStateBra <: AbstractClickState
+    coefs::Vector{ComplexF64}
+    clicks::Array{Int,2}
+    function ClickStateBra(coefs::Vector{ComplexF64}, clicks::Array{Int,2})
+        length(coefs) == size(clicks, 1) || throw(ArgumentError("Length of coefficients must match number of click patterns"))
+        new(coefs, clicks)
+    end
+end
+function Base.show(io::IO, cs::ClickStateBra)
+    Base.summary(io, cs)
+    print(io, join(["\n($cf)⟨$(join(cl, ","))|" for (cf, cl) in zip(cs.coefs, eachrow(cs.clicks))], " + "))
+end
+Base.:(==)(a::ClickStateBra, b::ClickStateBra) = a.clicks == b.clicks && a.coefs == b.coefs
+Base.:+(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
+Base.:-(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
+Base.:*(a::ComplexF64, b::ClickStateBra) = ClickStateBra(a .* b.coefs, b.clicks)
+Base.:*(a::Complex{Bool}, b::ClickStateBra) = ClickStateBra(a .* b.coefs, b.clicks)
+Base.:*(a::ClickStateBra, b::ComplexF64) = ClickStateBra(a.coefs .* b, a.clicks)
+Base.:*(a::ClickStateBra, b::Complex{Bool}) = ClickStateBra(a.coefs .* b, a.clicks)
+Base.:/(a::ClickStateBra, b::ComplexF64) = ClickStateBra(a.coefs ./ b, a.clicks)
+Base.adjoint(a::ClickStateBra) = ClickStateKet(conj(a.coefs), a.clicks)
+nmodes(cs::ClickStateBra) = size(cs.clicks, 2)
+
+dot(bra::ClickStateBra, ket::ClickStateKet) = sum(bcf * kcf * prod(bcl .== kcl) for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks)))
+
+
+abstract type AbstractProjector end
+
+mutable struct HybridProjector <: AbstractProjector
+    mds::Int
+
+    # Phase-space ring and variables for symbolic calculations
+    CC::ComplexField
+    R::Generic.MPolyRing{ComplexFieldElem}
+    qai::Vector{Generic.MPoly{ComplexFieldElem}}
+    pai::Vector{Generic.MPoly{ComplexFieldElem}}
+    qbi::Vector{Generic.MPoly{ComplexFieldElem}}
+    pbi::Vector{Generic.MPoly{ComplexFieldElem}}
+    α::Vector{Generic.MPoly{ComplexFieldElem}}
+    β::Vector{Generic.MPoly{ComplexFieldElem}}
+
+    # Cache for C polynomials
+    C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Float64}}, WTerms}
+
+    function HybridProjector(mds::Int)
+        # Define canonical phase-space variables for the circuit
+        _qai = ["qa$i" for i in 1:mds]
+        _pai = ["pa$i" for i in 1:mds]
+        _qbi = ["qb$i" for i in 1:mds]
+        _pbi = ["pb$i" for i in 1:mds]
+        all_qps = hcat(_qai, _pai, _qbi, _pbi)
+        CC = ComplexField()
+        i = onei(CC) # Imaginary unit in CC ring
+        R, generators = polynomial_ring(CC, all_qps)
+        (qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
+
+        # Define the α and β* vectors (note that we pre-conjugate β)
+        α = @. (qai + i * pai) / √2
+        β = @. (qbi - i * pbi) / √2
+
+        new(mds, CC, R, qai, pai, qbi, pbi, α, β, Dict{Tuple{Vector{Int8}, Vector{Float64}}, WTerms}())
+    end
+end
+
+function project(st::GaussianState, proj::HybridProjector, detector_outcomes::Vector{Int}; η::Vector{Float64}=ones(proj.mds))
+    proj.mds == nmodes(st) || throw(ArgumentError("Projector and state must have the same number of modes"))
+    proj.mds == length(detector_outcomes) || throw(ArgumentError("Projector and detector outcomes must have the same number of modes"))
+    proj.mds == length(η) || throw(ArgumentError("Projector and loss vector must have the same number of modes"))
+    all(η .>= 0) && all(η .<= 1) || throw(ArgumentError("Loss vector must be between 0 and 1"))
+    all(detector_outcomes .== 0 .|| detector_outcomes .== 1 .|| detector_outcomes .== -1) || throw(ArgumentError("Detector outcomes must be 0, 1, or -1"))
+    if purity(st) ≈ 1.
+        ProjectedPureGaussianState(st, proj, detector_outcomes, η)
+    else
+        throw(ArgumentError("Only pure Gaussian states are currently supported."))
+    end
+end
+_replace_colon(::Any) = throw(ArgumentError("Detector outcomes must be Int or Colon"))
+_replace_colon(i::Int) = i
+_replace_colon(::Colon) = -1
+project(st::GaussianState, proj::HybridProjector, detector_outcomes::Vector{Any}; η::Vector{Float64}=ones(proj.mds)) = ProjectedPureGaussianState(st, proj, _replace_colon.(detector_outcomes), η)
+
+
+abstract type AbstractProjectedState end
+abstract type AbstractProjectedPureGaussianState end
+
+struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
+    st::GaussianState
+    proj::HybridProjector
+    detector_outcomes::Vector{Int}
+    η::Vector{Float64}
+end
+
+"""
+    tr(projected_state::ProjectedPureGaussianState)
+
+Computes the probability of success for a given projected pure Gaussian state.
+"""
+function tr(projected_state::ProjectedPureGaussianState)::Float64
+    st = projected_state.st
+    proj = projected_state.proj
+    detector_outcomes = projected_state.detector_outcomes
+    η = projected_state.η
+
+    # Convert to K-function representation and compute probabilities.
+    # Gabs uses the ħ=2 convention, so rescale accordingly.
+    gstate = changebasis(QuadBlockBasis, st)
+    σ = gstate.covar ./ gstate.ħ
+    A, Γ = A_matrix(σ, η, detector_outcomes; traceout=true)
+
+    invA, detA = inv(A), det(A)
+    C = C_poly(proj, detector_outcomes, η)
+    detΓ = det(Γ)
+
+    Pgen = W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+    @assert isreal(Pgen) "Probability of success should be real, but got $Pgen"
+    real(Pgen)
+end
+
+function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet)::ComplexF64 # TODO: is this the right return type?
+    st = projected_state.st
+    η = projected_state.η
+    R = projected_state.proj.R
+    CC = projected_state.proj.CC
+    α = projected_state.proj.α
+    β = projected_state.proj.β
+    detector_outcomes = projected_state.detector_outcomes
+    count(detector_outcomes .== -1) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
+
+    gstate = changebasis(QuadBlockBasis, st)
+    σ = gstate.covar ./ gstate.ħ
+    A, Γ = A_matrix(σ, η, detector_outcomes; traceout=false)
+
+    invA, detA = inv(A), det(A)
+    detΓ = det(Γ)
+
+    C = zero(R)
+    for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
+        bcl_full, kcl_full = copy(detector_outcomes), copy(detector_outcomes)
+        bcl_full[detector_outcomes .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
+        kcl_full[detector_outcomes .== -1] .= kcl
+        ηweight = prod(η .^ ((bcl_full .+ kcl_full) ./ 2)) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
+        C += CC(bcf * kcf * ηweight) * prod(α .^ bcl_full) * prod(β .^ kcl_full)
+    end
+
+    W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+end
+fidelity(st::ClickStateKet, projected_state::ProjectedPureGaussianState) = dot(st', projected_state, st) / tr(projected_state)
+
+
+function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, detector_outcomes::Vector{Int}; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Matrix{Float64}}
+    mds = size(σ, 1) ÷ 2
+    Γ = σ + 0.5*I
+    Γinv = inv(Γ)
+
+    # Views of Γinv blocks
+    A  = @view Γinv[1:mds,      1:mds     ]
+    C  = @view Γinv[1:mds,      mds+1:2mds]
+    Cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
+    B  = @view Γinv[mds+1:2mds, mds+1:2mds]
+
+    # Compute K matrix (block diagonal [BB, conj(BB)]) from Γinv blocks
+    G = zeros(ComplexF64, 4mds, 4mds)
+    @views @. G[1:mds,      1:mds     ] = 0.5*A  + (0.25im)*(C + Cᵀ)
+    @views @. G[1:mds,      mds+1:2mds] = 0.5*C  - (0.25im)*(A - B)
+    @views @. G[mds+1:2mds, 1:mds     ] = 0.5*Cᵀ - (0.25im)*(A - B)
+    @views @. G[mds+1:2mds, mds+1:2mds] = 0.5*B  - (0.25im)*(C + Cᵀ)
+    @views @. G[2mds+1:4mds, 2mds+1:4mds] = conj(G[1:2mds, 1:2mds]) # TODO: can we eliminate this copy with views of K in the W() function? Or perhaps even a new type for this specific weird block structure of A = [a b; bᵀ a*]?
+    
+    # Add G matrix to K and return A = K + G
+    G += 0.5*I
+    for (i, n) in enumerate(detector_outcomes)
+        if traceout && n == -1
+            # No detector means we trace out the mode
+            # Expansion of αβ*
+            G[i,      i+2mds] += -0.5
+            G[i,      i+3mds] +=  0.5im
+            G[i+mds,  i+2mds] += -0.5im
+            G[i+mds,  i+3mds] += -0.5
+            G[i+2mds, i     ] += -0.5
+            G[i+2mds, i+mds ] += -0.5im
+            G[i+3mds, i     ] +=  0.5im
+            G[i+3mds, i+mds ] += -0.5
+        else
+            # Fock term (αβ*)ⁿ/n! is handled in the moment polynomial C, as it is not inside an exp()
+            # Expansion of αβ*(1 - η)
+            li = 1 - η[i]
+            G[i,      i+2mds] += -0.5   * li
+            G[i,      i+3mds] +=  0.5im * li
+            G[i+mds,  i+2mds] += -0.5im * li
+            G[i+mds,  i+3mds] += -0.5   * li
+            G[i+2mds, i     ] += -0.5   * li
+            G[i+2mds, i+mds ] += -0.5im * li
+            G[i+3mds, i     ] +=  0.5im * li
+            G[i+3mds, i+mds ] += -0.5   * li
+        end
+    end
+    (G, Γ)
+end
+
+function C_poly(proj::HybridProjector, detector_outcomes::Vector{Int}, η::Vector{Float64})::WTerms
+    get!(proj.C_poly_cache, (detector_outcomes, η)) do
+        C = one(proj.R)
+        for (ni, ηi, αi, βi) in zip(detector_outcomes, η, proj.α, proj.β)
+            if ni == 1
+                C *= (αi * βi * ηi)
+            # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
+            # tools.W() will need to be generalized
+            elseif ni > 1
+                C *= (αi * βi * ηi)^ni / factorial(ni)
+            end
+        end
+        extract_W_terms(C)
+    end
+end
