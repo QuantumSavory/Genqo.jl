@@ -8,16 +8,14 @@ using Plots
 ## ZALM calculations
 
 function zalm_metrics(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector, metric::Symbol=:none)
-    basis = QuadBlockBasis(2)
-    tmsv = eprstate(basis, asinh(√μ), 0.)
-    st = reduce(⊗, tmsv for _ in 1:4)
-    ms = modeswap(basis)
-    bs = beamsplitter(basis, 0.5)
+    basis4 = QuadBlockBasis(4)
+    basis8 = QuadBlockBasis(8)
+    st = eprstate(basis8, asinh(√μ), 0.)
+    ms = modeswap(basis4)
+    bs = beamsplitter(basis4, 0.5)
 
-    apply!(st, ms, [2,4])
-    apply!(st, ms, [5,7])
-    apply!(st, bs, [3,5])
-    apply!(st, bs, [4,6])
+    apply!(st, ms, [2,4, 5,7])
+    apply!(st, bs, [3,5, 4,6])
 
     η = [ηᵗ,ηᵗ,ηᵈ,ηᵈ,ηᵈ,ηᵈ,ηᵗ,ηᵗ]
     st_heralded = project(st, proj, [:,:,1,1,0,0,:,:]; η=η) # of some intermediate type just containing detection/loss/Gaussian state information, but not converted to a density matrix yet
@@ -70,6 +68,7 @@ function verify_zalm_Pgen()
 
     plot(μ, zalm_Pg_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=[1 2 3 4])
     plot!(μ, zalm_Pg_new, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
+    plot!(μ, μ.^2 ./ (μ.+1).^6, linestyle=:dash, color=:black)
 end
 verify_zalm_Pgen()
 
