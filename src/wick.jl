@@ -5,21 +5,20 @@ using BlockDiagonals
 export wick_out, W, WTerms, extract_W_terms
 
 
-# TODO: explore implementing the recursive matching algorithm directly in W() instead of precomputing all partitions
 """
-Precompute Wick partitions (perfect pairings) of 1:n
-Each partition is a Vector of (i, j) pairs (as Tuples)
+Precompute Wick partitions (perfect pairings) of 1:N.
+Stored as a (N-1)!! × 2 × (N/2) array of Int8, where each row is a perfect matching of the indices 1:N.
 """
-function _wick_partitions(N::Int)::Array{Int, 3}
+function _wick_partitions(N::Int8)::Array{Int8,3}
     iseven(N) || throw(ArgumentError("N must be even"))
 
     n_parts = prod(1:2:(N-1)) # number of perfect matchings of n elements
 
-    result = Array{Int, 3}(undef, n_parts, 2, N÷2) # will hold all partitions
+    result = Array{Int8,3}(undef, n_parts, 2, N÷2) # will hold all partitions
     
     # Recursive helper
     idx = 1
-    function backtrack(remaining::Vector{Int}, current::Vector{Tuple{Int,Int}})
+    function backtrack(remaining::Vector{Int8}, current::Vector{Tuple{Int8,Int8}})
         if isempty(remaining)
             # Found a complete pairing
             result[idx, :, :] .= reshape(collect(Iterators.flatten(current)), (2, N÷2))
@@ -43,46 +42,14 @@ function _wick_partitions(N::Int)::Array{Int, 3}
         end
     end
     
-    backtrack(collect(1:N), Tuple{Int,Int}[])
+    backtrack(collect(Int8, 1:N), Tuple{Int8,Int8}[])
     @assert idx == n_parts + 1 "Expected to fill all $n_parts partitions, but filled $(idx-1)"
     return result
 end
-const wick_partitions = Dict(N => _wick_partitions(N) for N in 0:2:12) # Precompute partitions for small N
+const _wick_partitions_cache = Ref(Dict{Int8, Array{Int8,3}}())
+wick_partitions(N::Int8)::Array{Int8,3} = get!(() -> _wick_partitions(N), _wick_partitions_cache[], N)
+wick_partitions(N::Int)::Array{Int8,3} = wick_partitions(Int8(N)) # dispatch to Int8 version for caching
 
-"""
-    wick_out(coef::ComplexF64, moment_vector::Vector{Int}, Ainv::Matrix{ComplexF64})
-
-Evaluate a single monomial term via Wick's theorem (sum over perfect pairings).
-
-For each Wick partition of the indices in `moment`, multiplies the corresponding
-entries of `Ainv` and accumulates the result, then scales by `coef`.
-
-# Parameters
-- coef  : Complex coefficient of the monomial
-- moment: Variable indices appearing in the monomial (length must be even)
-- Ainv  : Inverse A-matrix providing the two-point contractions
-
-# Returns
-`coef` times the sum of all Wick-contraction products for this monomial.
-"""
-function wick_out(coef::ComplexF64, moment::AbstractVector{Int}, Ainv::Matrix{ComplexF64})::ComplexF64
-    N = length(moment)
-    iseven(N) || return 0 # monomial with odd number of variables has no PMP set
-
-    # Iterate over Wick partitions
-    s = zero(ComplexF64)
-    parts = wick_partitions[N]
-    n_parts = size(parts, 1); n_pairs = size(parts, 3)
-    for m in 1:n_parts
-        f = one(ComplexF64)
-        for n in 1:n_pairs
-            i = parts[m, 1, n]; j = parts[m, 2, n]
-            f *= Ainv[moment[i], moment[j]]
-        end
-        s += f
-    end
-    return s * coef
-end
 
 """
     WBucket{N}
@@ -95,8 +62,9 @@ needs no Dict lookup at call time.
 struct WBucket{N}
     coeffs::Vector{ComplexF64}
     indices::Vector{NTuple{N,Int}}
-    parts::Array{Int,3}
 end
+Base.:*(a::C, b::WBucket{N}) where {C<:Number,N} = WBucket{N}(a * b.coeffs, b.indices)
+Base.:*(a::WBucket{N}, b::C) where {C<:Number,N} = WBucket{N}(b * a.coeffs, a.indices)
 
 """
     WTerms{Buckets<:Tuple}
@@ -105,19 +73,18 @@ A precompiled moment polynomial as a heterogeneous tuple of `WBucket`s, one per 
 the polynomial. The tuple type carries each bucket's `N` at compile time so iteration unrolls and
 each `_W_bucket` call specializes on its bucket's degree.
 """
-struct WTerms{Buckets<:Tuple}
-    buckets::Buckets
+struct WTerms{B<:Tuple}
+    buckets::B
 end
+Base.zero(::Type{WTerms{B}}) where {B<:Tuple} = WTerms(B())
+Base.:+(a::WTerms, b::WTerms) = WTerms((a.buckets..., b.buckets...)) # concatenate buckets
+Base.:*(a::C, b::WTerms) where {C<:Number} = WTerms(b.buckets .* a)
+Base.:*(a::WTerms, b::C) where {C<:Number} = WTerms(a.buckets .* b)
 
 """
     extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
 
 Precompile a Nemo polynomial into a `WTerms` object suitable for the fast `W(::WTerms, Ainv)` path.
-
-Walks `C`'s monomials, groups by degree (count of variables with exponent 1), and emits one
-`WBucket{N}` per present degree. Buckets are sorted by descending size so the largest one runs first.
-
-Performance is unimportant — this runs once at module load.
 
 Assumption (matched to current usage): moment polynomials are multilinear in the variables used for
 Wick evaluation (exponents are 0/1 for the variables of interest).
@@ -140,8 +107,6 @@ function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
             end
         end
         N = length(idxs)
-        haskey(wick_partitions, N) ||
-            error("extract_W_terms: monomial of degree $N has no precomputed wick partitions (have keys $(sort(collect(keys(wick_partitions)))))")
         cv, iv = get!(by_deg, N) do
             (ComplexF64[], Vector{Int}[])
         end
@@ -162,43 +127,13 @@ end
 end
 @inline function _make_bucket_typed(::Val{N}, coeffs::Vector{ComplexF64}, idxs_list::Vector{Vector{Int}}) where {N}
     indices = [NTuple{N,Int}(idxs) for idxs in idxs_list]
-    return WBucket{N}(coeffs, indices, wick_partitions[N])
-end
-
-"""
-    W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})
-
-Evaluate a (symbolic) moment polynomial by Wick contraction against `Ainv`.
-
-This expands `C` into monomials and, for each monomial, collects the indices of variables present
-(exponent 1), then calls `wick_out` to perform the sum over pairings. This is the general (slower) path
-used when terms have not been precompiled.
-
-# Parameters
-- C    : Moment polynomial to evaluate (symbolic)
-- Ainv : Inverse A-matrix providing the contraction kernel
-
-# Returns
-Complex value of the Gaussian moment implied by `C` and `Ainv`.
-"""
-function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})::ComplexF64
-    elm = zero(ComplexF64)
-    n_vars = nvars(parent(C))
-    for (mon, coeff) in zip(monomials(C), coefficients(C))
-        elm += wick_out(ComplexF64(coeff), [i for i in 1:n_vars if exponent(mon, 1, i) == 1], Ainv)
-    end
-    return elm
+    return WBucket{N}(coeffs, indices)
 end
 
 """
     W(t::WTerms, Ainv::Matrix{ComplexF64})
 
 Fast Wick evaluator for precompiled moment terms.
-
-This is the hot path used by SPDC/ZALM fidelity and probability calculations. Each `WBucket{N}` in
-`t.buckets` carries its own monomial coefficients, indices (as `NTuple{N,Int}` per monomial), and
-the precomputed Wick partition table. The bucket loop is unrolled by the compiler because
-`Buckets<:Tuple` carries every bucket's type.
 
 # Returns
 Complex value of the contracted moment.
@@ -212,12 +147,12 @@ W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
     _W_bucket(first(bs), Ainv) + _sum_buckets(Base.tail(bs), Ainv)
 
 @inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64})::ComplexF64 where {N}
-    parts = b.parts
+    parts = wick_partitions(N)
     n_parts = size(parts, 1)
     n_pairs = N ÷ 2
     s = zero(ComplexF64)
-    for x in eachindex(b.coeffs)
-        m = b.indices[x]                    # NTuple{N,Int}, stack-resident
+    @inbounds for x in eachindex(b.coeffs)
+        m = b.indices[x] # NTuple{N,Int}, stack-resident
         f = zero(ComplexF64)
         for k in 1:n_parts
             t = one(ComplexF64)
@@ -229,5 +164,49 @@ W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
         end
         s += b.coeffs[x] * f
     end
-    return s
+    s
+end
+
+"""
+    W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})
+
+Evaluate a (symbolic) moment polynomial by Wick contraction against `Ainv`.
+
+# Parameters
+- C    : Moment polynomial to evaluate (symbolic)
+- Ainv : Inverse A-matrix providing the contraction kernel
+
+# Returns
+Gaussian moment implied by `C` and `Ainv`.
+"""
+function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})::ComplexF64
+    n_vars = nvars(parent(C))
+    n_vars ≤ size(Ainv, 1) || throw(ArgumentError("C has $n_vars variables but Ainv is only $(size(Ainv, 1))×$(size(Ainv, 2))"))
+    elm = zero(ComplexF64)
+    for (mon, coeff) in zip(monomials(C), coefficients(C))
+        elm += coeff * wick_out([i for i in 1:n_vars if exponent(mon, 1, i) == 1], Ainv)
+    end
+    return elm
+end
+
+"""
+Evaluate a single monomial term via Wick's theorem (sum over perfect pairings).
+"""
+function wick_out(moment::Vector{Int}, Ainv::Matrix{ComplexF64})::ComplexF64
+    N = length(moment)
+    iseven(N) || return 0 # monomial with odd number of variables has no PMP set
+
+    # Iterate over Wick partitions
+    s = zero(ComplexF64)
+    parts = wick_partitions(N)
+    n_parts = size(parts, 1); n_pairs = size(parts, 3)
+    @inbounds for m in 1:n_parts
+        f = one(ComplexF64)
+        for n in 1:n_pairs
+            i = parts[m, 1, n]; j = parts[m, 2, n]
+            f *= Ainv[moment[i], moment[j]]
+        end
+        s += f
+    end
+    s
 end
