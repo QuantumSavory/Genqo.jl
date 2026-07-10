@@ -1,6 +1,7 @@
 using Genqo
 using Gabs
 
+using ProgressBars
 using Plots
 
 
@@ -45,7 +46,7 @@ function plot_pbp3_fidelity()
     states = pbp3.(μ, 1., η', η'; proj=proj)
     ψ⁻ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
-    Threads.@threads for I in CartesianIndices(states)
+    Threads.@threads for I in ProgressBar(CartesianIndices(states))
         F[I] = real(dot(ψ⁻', states[I], ψ⁻)) / tr(states[I])
     end
 
@@ -55,3 +56,10 @@ function plot_pbp3_fidelity()
     plot!(μ, F[:,4], label="\\eta = 0.25")
 end
 @time plot_pbp3_fidelity()
+
+##
+println("C_poly_cache:"); println(proj.C_poly_cache)
+el = fetch(proj.C_poly_cache[([0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0])])
+println("C_poly_cache element number of buckets: $(length(el.buckets))")
+println("C_poly_cache element bucket 1 number of indices: $(length(el.buckets[1].indices))")
+# println("C_poly_cache element bucket 1 indices:"); println(el.buckets[1].indices)

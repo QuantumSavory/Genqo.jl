@@ -6,7 +6,7 @@ using Plots
 
 # ZALM model
 
-function zalm2(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector, metric::Symbol=:none)
+function zalm2(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector)
     basis4 = QuadBlockBasis(4)
     basis8 = QuadBlockBasis(8)
     st = eprstate(basis8, asinh(√μ), 0.)
