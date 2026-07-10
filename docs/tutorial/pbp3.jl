@@ -41,7 +41,7 @@ end
 ## Fidelity
 function plot_pbp3_fidelity()
     proj = HybridProjector(12)
-    μ = range(1e-6, 0.1, 20)
+    μ = range(1e-4, 1.0, 100)
     η = [1., 0.8, 0.5, 0.25]
     states = pbp3.(μ, 1., η', η'; proj=proj)
     ψ⁻ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
