@@ -44,10 +44,10 @@ function plot_pbp3_fidelity()
     μ = range(1e-4, 1.0, 100)
     η = [1., 0.8, 0.5, 0.25]
     states = pbp3.(μ, 1., η', η'; proj=proj)
-    ψ⁻ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+    ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in ProgressBar(CartesianIndices(states))
-        F[I] = real(dot(ψ⁻', states[I], ψ⁻)) / tr(states[I])
+        F[I] = real(dot(ψ⁺', states[I], ψ⁺)) / tr(states[I])
     end
 
     plot(μ, F[:,1], label="\\eta = 1.0", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright, color=1)
