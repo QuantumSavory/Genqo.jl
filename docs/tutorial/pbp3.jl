@@ -56,10 +56,3 @@ function plot_pbp3_fidelity()
     plot!(μ, F[:,4], label="\\eta = 0.25")
 end
 @time plot_pbp3_fidelity()
-
-##
-println("C_poly_cache:"); println(proj.C_poly_cache)
-el = fetch(proj.C_poly_cache[([0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0], [0, 0, 1, 0, 0, 1, 1, 0, 0, 1, 0, 0])])
-println("C_poly_cache element number of buckets: $(length(el.buckets))")
-println("C_poly_cache element bucket 1 number of indices: $(length(el.buckets[1].indices))")
-# println("C_poly_cache element bucket 1 indices:"); println(el.buckets[1].indices)
