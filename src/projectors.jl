@@ -2,7 +2,9 @@ using Nemo
 using LinearAlgebra
 import LinearAlgebra: tr, dot
 using Gabs
+import Gabs: nmodes
 using QuantumOpticsBase
+import QuantumOpticsBase: fidelity
 
 export
     # Types
@@ -109,7 +111,7 @@ end
 _replace_colon(::Any) = throw(ArgumentError("Detector outcomes must be Int or Colon"))
 _replace_colon(i::Int) = i
 _replace_colon(::Colon) = -1
-project(st::GaussianState, proj::HybridProjector, detector_outcomes::Vector{Any}; η::Vector{Float64}=ones(proj.mds)) = ProjectedPureGaussianState(st, proj, _replace_colon.(detector_outcomes), η)
+project(st::GaussianState, proj::HybridProjector, detector_outcomes::Vector; η::Vector{Float64}=ones(proj.mds)) = project(st, proj, Vector{Int}(_replace_colon.(detector_outcomes)); η=η)
 
 
 abstract type AbstractProjectedState end
@@ -133,7 +135,7 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     α = proj.α
     β = proj.β
     detector_outcomes = projected_state.detector_outcomes
-    detector_outcomes_notraceout = max.(detector_outcomes, 0) # Filter out -1 (traceout) modes
+    n = max.(detector_outcomes, 0) # Filter out -1 (traceout) modes
     η = projected_state.η
 
     # Convert to K-function representation and compute probabilities.
@@ -144,16 +146,16 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
 
     invA, detA = inv(A), det(A)
     detΓ = det(Γ)
-    ηweight = prod(η .^ detector_outcomes_notraceout) # √η per detected photon, matching dot()'s per-click η factor
+    ηweight = prod(η .^ n) # √η per detected photon, matching dot()'s per-click η factor
 
-    C = @lock proj.C_poly_cache_lock get!(proj.C_poly_cache, (detector_outcomes_notraceout, detector_outcomes_notraceout)) do
+    C = @lock proj.C_poly_cache_lock get!(proj.C_poly_cache, (n, n)) do
         # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
         # tools.W() will need to be generalized
-        prod((α .* β) .^ detector_outcomes_notraceout) |> extract_W_terms
+        prod((α .* β) .^ n) |> extract_W_terms
     end
 
     Tr = W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
-    @assert isreal(Tr) "Trace of a density matrix should be real, but got $Tr"
+    @assert abs(imag(Tr)) ≤ 1e-10 * abs(Tr) "Trace of a density matrix should be real, but got $Tr"
     real(Tr)
 end
 
@@ -163,21 +165,21 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     proj = projected_state.proj
     α = proj.α
     β = proj.β
-    detector_outcomes = projected_state.detector_outcomes
-    count(detector_outcomes .== -1) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
+    n = projected_state.detector_outcomes
+    count(n .== -1) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
 
     gstate = changebasis(QuadBlockBasis, st)
     σ = gstate.covar ./ gstate.ħ
-    A, Γ = A_matrix(σ, η, detector_outcomes; traceout=false)
+    A, Γ = A_matrix(σ, η, n; traceout=false)
 
     invA, detA = inv(A), det(A)
     detΓ = det(Γ)
 
     C = zero(WTerms{Tuple{}}) # Start with empty WTerms
     for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
-        bcl_full, kcl_full = copy(detector_outcomes), copy(detector_outcomes)
-        bcl_full[detector_outcomes .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
-        kcl_full[detector_outcomes .== -1] .= kcl
+        bcl_full, kcl_full = copy(n), copy(n)
+        bcl_full[n .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
+        kcl_full[n .== -1] .= kcl
         Cij = @lock proj.C_poly_cache_lock get!(proj.C_poly_cache, (bcl_full, kcl_full)) do
             prod(α .^ bcl_full) * prod(β .^ kcl_full) |> extract_W_terms
         end

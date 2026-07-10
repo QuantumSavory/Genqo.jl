@@ -4,7 +4,7 @@ version = "1.2.0"
 authors = ["Jacob Gunnell <jacob.r.gunnell@gmail.com>"]
 
 [workspace]
-projects = ["test", "docs"]
+projects = ["test", "docs", "benchmark"]
 
 [deps]
 BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
@@ -15,7 +15,7 @@ QuantumOpticsBase = "4f57444f-1401-5e15-980d-4471b28d5678"
 
 [compat]
 BlockDiagonals = "0.2.0"
-Gabs = "1.3.6"
+Gabs = "1.3.7"
 LinearAlgebra = "1.12.0"
 Nemo = "0.53.2"
 QuantumOpticsBase = "0.5.10"

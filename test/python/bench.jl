@@ -126,20 +126,20 @@ SUITE["logsweep_1d"]                 = @benchmarkable tmsv.probability_success.(
 # If running this file directly, run benchmarks
 if abspath(PROGRAM_FILE) == @__FILE__
     # Filter suite based on func_filter if provided
+    suite = SUITE
     if !isempty(func_filter)
-        filtered_suite = BenchmarkGroup()
+        suite = BenchmarkGroup()
         for (name, benchmark) in SUITE
             if occursin(func_filter, name)
-                filtered_suite[name] = benchmark
+                suite[name] = benchmark
             end
         end
-        SUITE = filtered_suite
-        if isempty(SUITE)
+        if isempty(suite)
             @warn "No benchmarks matched filter: $func_filter"
         end
     end
 
-    results = run(SUITE)
+    results = run(suite)
     for (func, trial) in results
         println("$func:")
         display(trial)
