@@ -30,11 +30,9 @@ Base.:(==)(a::ClickStateKet, b::ClickStateKet) = a.clicks == b.clicks && a.coefs
 Base.isapprox(a::ClickStateKet, b::ClickStateKet; kwargs...) = a.clicks == b.clicks && isapprox(a.coefs, b.coefs; kwargs...)
 Base.:+(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
 Base.:-(a::ClickStateKet, b::ClickStateKet) = ClickStateKet(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
-Base.:*(a::ComplexF64, b::ClickStateKet) = ClickStateKet(a .* b.coefs, b.clicks)
-Base.:*(a::Complex{Bool}, b::ClickStateKet) = ClickStateKet(a .* b.coefs, b.clicks)
-Base.:*(a::ClickStateKet, b::Number) = ClickStateKet(a.coefs .* b, a.clicks)
-Base.:*(a::ClickStateKet, b::Complex{Bool}) = ClickStateKet(a.coefs .* b, a.clicks)
-Base.:/(a::ClickStateKet, b::Number) = ClickStateKet(a.coefs ./ b, a.clicks)
+Base.:*(a::N, b::ClickStateKet) where {N<:Number} = ClickStateKet(a .* b.coefs, b.clicks)
+Base.:*(a::ClickStateKet, b::N) where {N<:Number} = ClickStateKet(a.coefs .* b, a.clicks)
+Base.:/(a::ClickStateKet, b::N) where {N<:Number} = ClickStateKet(a.coefs ./ b, a.clicks)
 Base.adjoint(a::ClickStateKet) = ClickStateBra(conj(a.coefs), a.clicks)
 nmodes(cs::ClickStateKet) = size(cs.clicks, 2)
 
@@ -54,11 +52,9 @@ Base.:(==)(a::ClickStateBra, b::ClickStateBra) = a.clicks == b.clicks && a.coefs
 Base.isapprox(a::ClickStateBra, b::ClickStateBra; kwargs...) = a.clicks == b.clicks && isapprox(a.coefs, b.coefs; kwargs...)
 Base.:+(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, b.coefs), vcat(a.clicks, b.clicks))
 Base.:-(a::ClickStateBra, b::ClickStateBra) = ClickStateBra(vcat(a.coefs, -b.coefs), vcat(a.clicks, b.clicks))
-Base.:*(a::ComplexF64, b::ClickStateBra) = ClickStateBra(a .* b.coefs, b.clicks)
-Base.:*(a::Complex{Bool}, b::ClickStateBra) = ClickStateBra(a .* b.coefs, b.clicks)
-Base.:*(a::ClickStateBra, b::ComplexF64) = ClickStateBra(a.coefs .* b, a.clicks)
-Base.:*(a::ClickStateBra, b::Complex{Bool}) = ClickStateBra(a.coefs .* b, a.clicks)
-Base.:/(a::ClickStateBra, b::ComplexF64) = ClickStateBra(a.coefs ./ b, a.clicks)
+Base.:*(a::N, b::ClickStateBra) where {N<:Number} = ClickStateBra(a .* b.coefs, b.clicks)
+Base.:*(a::ClickStateBra, b::N) where {N<:Number} = ClickStateBra(a.coefs .* b, a.clicks)
+Base.:/(a::ClickStateBra, b::N) where {N<:Number} = ClickStateBra(a.coefs ./ b, a.clicks)
 Base.adjoint(a::ClickStateBra) = ClickStateKet(conj(a.coefs), a.clicks)
 nmodes(cs::ClickStateBra) = size(cs.clicks, 2)
 
@@ -70,18 +66,13 @@ abstract type AbstractProjector end
 mutable struct HybridProjector <: AbstractProjector
     mds::Int
 
-    # Phase-space ring and variables for symbolic calculations
-    CC::ComplexField
-    R::Generic.MPolyRing{ComplexFieldElem}
-    qai::Vector{Generic.MPoly{ComplexFieldElem}}
-    pai::Vector{Generic.MPoly{ComplexFieldElem}}
-    qbi::Vector{Generic.MPoly{ComplexFieldElem}}
-    pbi::Vector{Generic.MPoly{ComplexFieldElem}}
+    # Phase-space variables for symbolic calculations
     α::Vector{Generic.MPoly{ComplexFieldElem}}
     β::Vector{Generic.MPoly{ComplexFieldElem}}
 
-    # Cache for C polynomials
-    C_poly_cache::Dict{Vector{Float64}, WTerms}
+    # Cache for C polynomials (α_click, β_click) => contraction terms
+    C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}
+    const C_poly_cache_lock::ReentrantLock # for multithreading safety
 
     function HybridProjector(mds::Int)
         # Define canonical phase-space variables for the circuit
@@ -99,7 +90,7 @@ mutable struct HybridProjector <: AbstractProjector
         α = @. (qai + i * pai) / √2
         β = @. (qbi - i * pbi) / √2
 
-        new(mds, CC, R, qai, pai, qbi, pbi, α, β, Dict{Tuple{Vector{Int8}, Vector{Float64}}, WTerms}())
+        new(mds, α, β, Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}(), ReentrantLock())
     end
 end
 
@@ -155,24 +146,21 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     detΓ = det(Γ)
     ηweight = prod(η .^ detector_outcomes_notraceout) # √η per detected photon, matching dot()'s per-click η factor
 
-    C = get!(proj.C_poly_cache, detector_outcomes) do
+    C = @lock proj.C_poly_cache_lock get!(proj.C_poly_cache, (detector_outcomes_notraceout, detector_outcomes_notraceout)) do
         # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
         # tools.W() will need to be generalized
-        C = prod((α .* β) .^ detector_outcomes_notraceout)
-        extract_W_terms(C)
+        prod((α .* β) .^ detector_outcomes_notraceout) |> extract_W_terms
     end
 
-    Pgen = W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
-    @assert isreal(Pgen) "Probability of success should be real, but got $Pgen"
-    real(Pgen)
+    Tr = W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+    @assert isreal(Tr) "Trace of a density matrix should be real, but got $Tr"
+    real(Tr)
 end
 
 function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet)::ComplexF64 # TODO: is this the right return type?
     st = projected_state.st
     η = projected_state.η
     proj = projected_state.proj
-    R = proj.R
-    CC = proj.CC
     α = proj.α
     β = proj.β
     detector_outcomes = projected_state.detector_outcomes
@@ -185,19 +173,22 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     invA, detA = inv(A), det(A)
     detΓ = det(Γ)
 
-    # TODO: get! from C_poly_cache
-    C = zero(R)
+    C = zero(WTerms{Tuple{}}) # Start with empty WTerms
     for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
         bcl_full, kcl_full = copy(detector_outcomes), copy(detector_outcomes)
         bcl_full[detector_outcomes .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
         kcl_full[detector_outcomes .== -1] .= kcl
+        Cij = @lock proj.C_poly_cache_lock get!(proj.C_poly_cache, (bcl_full, kcl_full)) do
+            prod(α .^ bcl_full) * prod(β .^ kcl_full) |> extract_W_terms
+        end
         ηweight = prod(η .^ ((bcl_full .+ kcl_full) ./ 2)) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
-        C += CC(bcf * kcf * ηweight) * prod(α .^ bcl_full) * prod(β .^ kcl_full)
+        C += bcf * kcf * ηweight * Cij
     end
 
     W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
 end
-fidelity(st::ClickStateKet, projected_state::ProjectedPureGaussianState) = dot(st', projected_state, st) / tr(projected_state)
+fidelity(target::ClickStateKet, projected_state::ProjectedPureGaussianState) = dot(target', projected_state, target) / tr(projected_state)
+fidelity(target::ClickStateBra, projected_state::ProjectedPureGaussianState) = dot(target, projected_state, target') / tr(projected_state)
 
 """
 Computes the unnormalized Fock-basis photon-photon density matrix of a projected pure Gaussian state
