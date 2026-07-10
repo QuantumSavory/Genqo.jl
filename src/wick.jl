@@ -56,8 +56,6 @@ wick_partitions(N::Int)::Array{Int8,3} = wick_partitions(Int8(N)) # dispatch to 
 
 A homogeneous group of monomials that all have the same degree `N`. Stored as struct-of-arrays for
 cache locality, with indices as `NTuple{N,Int}` so the inner Wick loop reads them from registers.
-The `parts::Array{Int,3}` table is the same `wick_partitions[N]` cache, copied here so the kernel
-needs no Dict lookup at call time.
 """
 struct WBucket{N}
     coeffs::Vector{ComplexF64}
@@ -146,23 +144,75 @@ W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
 @inline _sum_buckets(bs::Tuple, Ainv::Matrix{ComplexF64}) =
     _W_bucket(first(bs), Ainv) + _sum_buckets(Base.tail(bs), Ainv)
 
+# Degree up to which `_hafnian` is emitted as a single fully unrolled, inlined expression. The
+# expression has (K-1)!! product terms, so compile time explodes past this; higher degrees expand
+# along the first index at runtime, recursing into the unrolled kernels below the threshold.
+const _HAFNIAN_UNROLL_MAX = 10
+
+# Linear index of pair (i < j) within the upper-triangle gather tuple of a degree-K monomial.
+_haf_pairidx(i::Int, j::Int, K::Int) = (i-1)*K - (i*(i+1))÷2 + j
+
+# Expression for the hafnian over monomial positions `pos`, reading pair values from the gathered
+# upper-triangle tuple `S`. Expands along the first position: haf(pos) = Σₜ S[1,t]·haf(pos∖{1,t}).
+# Identical sub-hafnian subtrees repeat across branches and get CSE'd during codegen.
+function _haf_expr(pos::Vector{Int}, K::Int)
+    isempty(pos) && return :(one(ComplexF64))
+    length(pos) == 2 && return :(S[$(_haf_pairidx(pos[1], pos[2], K))])
+    terms = Expr[]
+    for t in 2:length(pos)
+        rest = [pos[r] for r in 2:length(pos) if r != t]
+        push!(terms, :(S[$(_haf_pairidx(pos[1], pos[t], K))] * $(_haf_expr(rest, K))))
+    end
+    Expr(:call, :+, terms...)
+end
+
+"""
+    _hafnian(A::Matrix{ComplexF64}, m::NTuple{K,Int})
+
+Wick contraction of one degree-`K` monomial: the sum over all perfect pairings of `m` of the
+product of `A[m[i], m[j]]` over the pairs, i.e. the hafnian of the submatrix `A[m, m]`.
+
+Recursive expansion along the first index shares sub-hafnian prefixes between pairings, so it
+needs far fewer multiplies than enumerating `wick_partitions(K)` (147 vs 420 at K = 8). Odd-degree
+monomials have no perfect pairing and contract to zero, matching `wick_out`.
+"""
+@inline _hafnian(A::Matrix{ComplexF64}, ::Tuple{}) = one(ComplexF64)
+@inline _hafnian(A::Matrix{ComplexF64}, m::NTuple{2,Int}) = @inbounds A[m[1], m[2]]
+@generated function _hafnian(A::Matrix{ComplexF64}, m::NTuple{K,Int})::ComplexF64 where {K}
+    isodd(K) && return :(zero(ComplexF64))
+    if K <= _HAFNIAN_UNROLL_MAX
+        # Gather the upper-triangle submatrix once, then evaluate the fully unrolled expansion in
+        # registers. Inlined into `_W_bucket`'s monomial loop.
+        gathers = Expr[]
+        for i in 1:K-1, j in i+1:K
+            push!(gathers, :(@inbounds A[m[$i], m[$j]]))
+        end
+        return quote
+            $(Expr(:meta, :inline))
+            S = $(Expr(:tuple, gathers...))
+            $(_haf_expr(collect(1:K), K))
+        end
+    else
+        # One level of expansion along the first index; recursion reaches the fast unrolled
+        # kernels once the tuple shrinks to _HAFNIAN_UNROLL_MAX.
+        stmts = Expr[]
+        for t in 2:K
+            rest = Expr(:tuple, (:(m[$r]) for r in 2:K if r != t)...)
+            push!(stmts, :(s += @inbounds(A[m[1], m[$t]]) * _hafnian(A, $rest)))
+        end
+        return quote
+            s = zero(ComplexF64)
+            $(stmts...)
+            s
+        end
+    end
+end
+
+# TODO: Implement some up-front bounds safety check so that the inner loop can be fully @inbounds.
 @inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64})::ComplexF64 where {N}
-    parts = wick_partitions(N)
-    n_parts = size(parts, 1)
-    n_pairs = N ÷ 2
     s = zero(ComplexF64)
     @inbounds for x in eachindex(b.coeffs)
-        m = b.indices[x] # NTuple{N,Int}, stack-resident
-        f = zero(ComplexF64)
-        for k in 1:n_parts
-            t = one(ComplexF64)
-            for n in 1:n_pairs
-                i = parts[k, 1, n]; j = parts[k, 2, n]
-                t *= Ainv[m[i], m[j]]
-            end
-            f += t
-        end
-        s += b.coeffs[x] * f
+        s += b.coeffs[x] * _hafnian(Ainv, b.indices[x])
     end
     s
 end
