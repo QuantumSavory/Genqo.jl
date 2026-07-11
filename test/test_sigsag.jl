@@ -3,12 +3,12 @@
 
     GT = GroundTruth.GT
     P = GroundTruth.PARAMS["sigsag"]
-    proj = HybridProjector(6)
+    engine = HybridProjectionEngine(6)
     ψ⁺ = GroundTruth.bell4()
 
     # Heralding clicks on output modes 1, 2 with efficiency ηᵈ; the photon-photon
     # state lives in the traced-out measured modes 3–6 with efficiency ηᵗ
-    outcomes = [1, 1, -1, -1, -1, -1]
+    Π = projector([1, 1, -1, -1, -1, -1])
     sigsag_η(ηᵗ, ηᵈ) = [ηᵈ, ηᵈ, ηᵗ, ηᵗ, ηᵗ, ηᵗ]
 
     for i in 1:GroundTruth.GT_NCASES
@@ -26,12 +26,12 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         η = sigsag_η(ηᵗ, ηᵈ)
-        ps = project(st, proj, outcomes; η = η)
+        ps = project(st, Π; engine, η = η)
         @test tr(ps) ≈ GT["sigsag/pgen"][i] rtol = 1e-9
         @test real(fidelity(ψ⁺, ps)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
 
         # Same results from the legacy covariance wrapped directly
-        ps_legacy = project(GroundTruth.legacy_state(cov), proj, outcomes; η = η)
+        ps_legacy = project(GroundTruth.legacy_state(cov), Π; engine, η = η)
         @test tr(ps_legacy) ≈ GT["sigsag/pgen"][i] rtol = 1e-9
         @test real(fidelity(ψ⁺, ps_legacy)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
     end

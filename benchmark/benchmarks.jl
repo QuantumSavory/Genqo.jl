@@ -32,7 +32,7 @@ SUITE["wick.W_zalm_bell"] = @benchmarkable W(terms, Ainv) setup = (terms = extra
 
 
 # v2 generalized framework: ZALM source built from Gabs circuits, projected with a
-# pre-warmed HybridProjector so steady-state (cached-polynomial) evaluation is measured
+# pre-warmed HybridProjectionEngine so steady-state (cached-polynomial) evaluation is measured
 
 function zalm_state(μ)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), Float64(π))
@@ -45,21 +45,21 @@ function zalm_state(μ)
     st
 end
 
-const ZALM_OUTCOMES = [-1, -1, 1, 1, 0, 0, -1, -1]
+const ZALM_Π = projector([-1, -1, 1, 1, 0, 0, -1, -1])
 const ZALM_η = [ηᵗ * ηᵈ, ηᵗ * ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ * ηᵈ, ηᵗ * ηᵈ]
-const PROJ8 = HybridProjector(8)
+const ENGINE8 = HybridProjectionEngine(8)
 const ψ⁺ = (clicks([1, 0, 0, 1]) + clicks([0, 1, 1, 0])) / √2
 const ψ⁺ᵈ = ψ⁺'
 
-let ps = project(zalm_state(μ), PROJ8, ZALM_OUTCOMES; η = ZALM_η) # warm the C-polynomial cache
+let ps = project(zalm_state(μ), ZALM_Π; engine = ENGINE8, η = ZALM_η) # warm the C-polynomial cache
     tr(ps)
     dot(ψ⁺ᵈ, ps, ψ⁺)
 end
 
 SUITE["project.zalm_state"] = @benchmarkable zalm_state($μ)
-SUITE["project.tr"] = @benchmarkable tr(ps) setup = (ps = project(zalm_state($μ), PROJ8, ZALM_OUTCOMES; η = ZALM_η))
-SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺) setup = (ps = project(zalm_state($μ), PROJ8, ZALM_OUTCOMES; η = ZALM_η))
-SUITE["project.to_fock"] = @benchmarkable to_fock(ps; cutoff = 1) setup = (ps = project(zalm_state($μ), PROJ8, ZALM_OUTCOMES; η = ZALM_η))
+SUITE["project.tr"] = @benchmarkable tr(ps) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
+SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
+SUITE["project.to_fock"] = @benchmarkable to_fock(ps; cutoff = 1) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
 
 
 # v1 legacy sources: one headline calculation per source

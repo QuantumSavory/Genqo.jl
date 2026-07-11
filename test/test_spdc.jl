@@ -3,7 +3,7 @@
 
     GT = GroundTruth.GT
     P = GroundTruth.PARAMS["spdc"]
-    proj = HybridProjector(4)
+    engine = HybridProjectionEngine(4)
     ψ⁺ = GroundTruth.bell4()
 
     for i in 1:GroundTruth.GT_NCASES
@@ -20,7 +20,7 @@
         # The legacy fidelity carries an extra (ηᵗηᵈ)² prefactor — (ηᵗηᵈ)⁴ in total —
         # relative to v2's per-photon loss weighting η^((bra+ket)/2), which matches the
         # convention used by the ZALM/SIGSAG legacy code.
-        ps = project(st, proj, [-1, -1, -1, -1]; η = fill(ηᵗ * ηᵈ, 4))
+        ps = project(st, projector([-1, -1, -1, -1]); engine, η = fill(ηᵗ * ηᵈ, 4))
         @test real(dot(ψ⁺', ps, ψ⁺)) * (ηᵗ * ηᵈ)^2 ≈ GT["spdc/fidelity"][i] rtol = 1e-9
     end
 end

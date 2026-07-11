@@ -3,12 +3,12 @@
 
     GT = GroundTruth.GT
     P = GroundTruth.PARAMS["zalm"]
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     ψ⁺ = GroundTruth.bell4()
 
     # Signal modes (1, 2, 7, 8) are kept for the photon-photon state; BSM heralds on
     # clicks in modes 3, 4 and vacuum in modes 5, 6 (cf. zalm.moment_vector.trc)
-    outcomes = [-1, -1, 1, 1, 0, 0, -1, -1]
+    Π = projector([-1, -1, 1, 1, 0, 0, -1, -1])
     zalm_η(ηᵗ, ηᵈ, ηᵇ) = [ηᵗ * ηᵈ, ηᵗ * ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ * ηᵈ, ηᵗ * ηᵈ]
 
     for i in 1:GroundTruth.GT_NCASES
@@ -27,17 +27,17 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         η = zalm_η(ηᵗ, ηᵈ, ηᵇ)
-        ps = project(st, proj, outcomes; η = η)
+        ps = project(st, Π; engine, η = η)
         @test tr(ps) ≈ GT["zalm/pgen"][i] rtol = 1e-9
         @test real(fidelity(ψ⁺, ps)) ≈ GT["zalm/fidelity"][i] rtol = 1e-9
 
         # Same results from the legacy covariance wrapped directly
-        ps_legacy = project(GroundTruth.legacy_state(cov), proj, outcomes; η = η)
+        ps_legacy = project(GroundTruth.legacy_state(cov), Π; engine, η = η)
         @test tr(ps_legacy) ≈ GT["zalm/pgen"][i] rtol = 1e-9
         @test real(fidelity(ψ⁺, ps_legacy)) ≈ GT["zalm/fidelity"][i] rtol = 1e-9
 
         # Colon shorthand for the traced-out signal modes is equivalent
-        ps_colon = project(st, proj, [:, :, 1, 1, 0, 0, :, :]; η = η)
+        ps_colon = project(st, projector([:, :, 1, 1, 0, 0, :, :]); engine, η = η)
         @test tr(ps_colon) ≈ tr(ps)
     end
 end
@@ -48,9 +48,9 @@ end
 
     GT = GroundTruth.GT
     μ, ηᵗ, ηᵈ, ηᵇ = GroundTruth.PARAMS["zalm"][1, :] # lossless case only; to_fock is O(4^2m) dots
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     st = GroundTruth.legacy_state(GT["zalm/covariance"][:, :, 1])
-    ps = project(st, proj, [-1, -1, 1, 1, 0, 0, -1, -1])
+    ps = project(st, projector([-1, -1, 1, 1, 0, 0, -1, -1]); engine)
 
     dm = to_fock(ps; cutoff = 1)
     @test size(dm.data) == (16, 16)

@@ -6,26 +6,22 @@ using Plots
 
 # ZALM model
 
-function zalm2(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector)
-    basis4 = QuadBlockBasis(4)
-    basis8 = QuadBlockBasis(8)
-    st = eprstate(basis8, asinh(√μ), 0.)
-    ms = modeswap(basis4)
-    bs = beamsplitter(basis4, 0.5)
-
-    apply!(st, ms, [2,4, 5,7])
-    apply!(st, bs, [3,5, 4,6])
+function zalm2(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; engine::HybridProjectionEngine)
+    st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
+    apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
+    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
 
     η = [ηᵗ,ηᵗ,ηᵈ,ηᵈ,ηᵈ,ηᵈ,ηᵗ,ηᵗ]
-    project(st, proj, [:,:,1,1,0,0,:,:]; η=η)
+    Π = projector([:,:,1,1,0,0,:,:])
+    project(st, Π; engine, η=η)
 end
 
 ## Probability of generation
 function plot_zalm2_probability()
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = zalm2.(μ, η', η'; proj=proj)
+    states = zalm2.(μ, η', η'; engine=engine)
 
     Pgen = tr.(states)
     Pgen_ground = zalm.probability_success.(μ, η', 1, η', 0)
@@ -38,10 +34,10 @@ end
 
 ## Fidelity
 function plot_zalm2_fidelity()
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = zalm2.(μ, η', η'; proj=proj)
+    states = zalm2.(μ, η', η'; engine=engine)
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in CartesianIndices(states)

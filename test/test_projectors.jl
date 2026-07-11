@@ -1,72 +1,78 @@
-@testitem "HybridProjector construction" begin
-    proj = HybridProjector(3)
-    @test proj.mds == 3
-    @test length(proj.α) == 3
-    @test length(proj.β) == 3
-    @test isempty(proj.C_poly_cache)
+@testitem "HybridProjectionEngine construction" begin
+    engine = HybridProjectionEngine(3)
+    @test engine.mds == 3
+    @test length(engine.α) == 3
+    @test length(engine.β) == 3
+    @test isempty(engine.C_poly_cache)
 end
 
 @testitem "project argument validation" begin
     using Gabs
 
-    proj = HybridProjector(2)
+    engine = HybridProjectionEngine(2)
     st = eprstate(QuadBlockBasis(2), asinh(√1e-2), Float64(π))
 
-    # State and projector must have the same number of modes
-    @test_throws ArgumentError project(vacuumstate(QuadBlockBasis(3)), proj, [1, 1, 1])
-    # Detector outcomes must have one entry per mode
-    @test_throws ArgumentError project(st, proj, [1])
-    @test_throws ArgumentError project(st, proj, [1, 1, 0])
-    # Loss vector must have one entry per mode and lie in [0, 1]
-    @test_throws ArgumentError project(st, proj, [1, 1]; η = [0.9])
-    @test_throws ArgumentError project(st, proj, [1, 1]; η = [0.9, 1.1])
-    @test_throws ArgumentError project(st, proj, [1, 1]; η = [-0.1, 0.9])
-    # Outcomes are restricted to {-1, 0, 1}
-    @test_throws ArgumentError project(st, proj, [2, 1])
-    @test_throws ArgumentError project(st, proj, [1, -2])
+    # Engine, state, projector, and loss vector must have the same number of modes
+    @test_throws ArgumentError project(vacuumstate(QuadBlockBasis(3)), projector([1, 1, 1]); engine)
+    @test_throws ArgumentError project(st, projector([1]); engine)
+    @test_throws ArgumentError project(st, projector([1, 1, 0]); engine)
+    @test_throws ArgumentError project(st, projector([1, 1]); engine, η = [0.9])
+    # Loss vector must lie in [0, 1]
+    @test_throws ArgumentError project(st, projector([1, 1]); engine, η = [0.9, 1.1])
+    @test_throws ArgumentError project(st, projector([1, 1]); engine, η = [-0.1, 0.9])
+    # Detector outcomes are restricted to {-1, 0, 1} (higher photon numbers are a TODO)
+    @test_throws ArgumentError project(st, projector([2, 1]); engine)
     # Only pure Gaussian states are supported
-    @test_throws ArgumentError project(thermalstate(QuadBlockBasis(2), 2), proj, [1, 1])
-    # Colon-form outcomes only accept Int or Colon entries
-    @test_throws ArgumentError project(st, proj, [:, 1.5])
+    @test_throws ArgumentError project(thermalstate(QuadBlockBasis(2), 2), projector([1, 1]); engine)
 
     # Valid calls construct a projected state
-    @test project(st, proj, [1, 1]) isa ProjectedPureGaussianState
-    @test project(st, proj, [:, 1]) isa ProjectedPureGaussianState
+    @test project(st, projector([1, 1]); engine) isa ProjectedPureGaussianState
+    @test project(st, projector([:, 1]); engine) isa ProjectedPureGaussianState
+    # Sums of click projectors are valid detector outcomes
+    Π = projector([1, 0]) + projector([0, 1])
+    @test project(st, Π; engine) isa ProjectedPureGaussianState
 end
 
 @testitem "projected state trace" begin
     using Gabs
 
-    proj = HybridProjector(2)
+    engine = HybridProjectionEngine(2)
     st = eprstate(QuadBlockBasis(2), asinh(√1e-1), Float64(π))
+    η = [0.9, 0.8]
 
     # Coincidence probability is a real number in (0, 1]
-    p = tr(project(st, proj, [1, 1]; η = [0.9, 0.8]))
+    p = tr(project(st, projector([1, 1]); engine, η = η))
     @test p isa Float64
     @test 0 < p < 1
 
     # Tracing out every mode recovers the full trace of the density matrix
-    @test tr(project(st, proj, [-1, -1])) ≈ 1.0
-
+    @test tr(project(st, projector([-1, -1]); engine)) ≈ 1.0
     # Colon shorthand is equivalent to -1 outcomes
-    ps_colon = project(st, proj, [:, :])
-    @test tr(ps_colon) ≈ 1.0
+    @test tr(project(st, projector([:, :]); engine)) ≈ 1.0
+
+    # The trace is additive over the patterns of a summed projector
+    Pa, Pb = projector([1, 0]), projector([0, 1])
+    p_sum = tr(project(st, Pa + Pb; engine, η = η))
+    @test p_sum ≈ tr(project(st, Pa; engine, η = η)) + tr(project(st, Pb; engine, η = η))
+    # Together with the mutually exclusive complements, probabilities sum to 1
+    total = p_sum + tr(project(st, projector([0, 0]) + projector([1, 1]); engine, η = η))
+    @test total < 1 # cutoff at 1 photon per mode leaves out higher-number events
 
     # Repeated evaluation hits the compiled-polynomial cache and reproduces the result
-    @test !isempty(proj.C_poly_cache)
-    @test tr(project(st, proj, [1, 1]; η = [0.9, 0.8])) == p
+    @test !isempty(engine.C_poly_cache)
+    @test tr(project(st, projector([1, 1]); engine, η = η)) == p
 end
 
 @testitem "projected state matrix elements and fidelity" begin
     using Gabs
 
-    proj = HybridProjector(2)
+    engine = HybridProjectionEngine(2)
     st = eprstate(QuadBlockBasis(2), asinh(√1e-1), Float64(π))
-    ps = project(st, proj, [-1, -1]; η = [0.9, 0.8])
+    ps = project(st, projector([-1, -1]); engine, η = [0.9, 0.8])
 
     # Bra/ket mode count must match the number of traced-out modes
     @test_throws ArgumentError dot(clicks([1])', ps, clicks([1]))
-    ps_partial = project(st, proj, [1, -1]; η = [0.9, 0.8])
+    ps_partial = project(st, projector([1, -1]); engine, η = [0.9, 0.8])
     @test_throws ArgumentError dot(clicks([1, 0])', ps_partial, clicks([1, 0]))
 
     # Diagonal elements are real populations; off-diagonal pairs are conjugate
@@ -82,18 +88,18 @@ end
     @test fidelity(ψ, ps) ≈ dot(ψ', ps, ψ) / tr(ps)
     @test fidelity(ψ', ps) ≈ fidelity(ψ, ps)
 
-    # Colon and Vector{Int} forms give identical physics
-    ps_colon = project(st, proj, [:, :]; η = [0.9, 0.8])
+    # Colon and -1 outcome forms give identical physics
+    ps_colon = project(st, projector([:, :]); engine, η = [0.9, 0.8])
     @test dot(ψ', ps_colon, ψ) ≈ dot(ψ', ps, ψ)
 end
 
 @testitem "to_fock" begin
     using Gabs
-    using LinearAlgebra: ishermitian, diag
+    using LinearAlgebra: diag
 
-    proj = HybridProjector(2)
+    engine = HybridProjectionEngine(2)
     st = eprstate(QuadBlockBasis(2), asinh(√1e-1), Float64(π))
-    ps = project(st, proj, [-1, -1]; η = [0.9, 0.8])
+    ps = project(st, projector([-1, -1]); engine, η = [0.9, 0.8])
 
     dm = to_fock(ps; cutoff = 1)
     @test size(dm.data) == (4, 4)

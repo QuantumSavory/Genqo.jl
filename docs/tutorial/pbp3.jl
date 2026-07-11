@@ -7,26 +7,25 @@ using Plots
 
 # 3-source PBP model
 
-function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64; proj::HybridProjector)
-    basis2 = QuadBlockBasis(2)
-    basis4 = QuadBlockBasis(4)
-    sagnac = eprstate(basis4, asinh(√μ), 0.)
-    apply!(sagnac, modeswap(basis2), [1,3])
+function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64; engine::HybridProjectionEngine)
+    sagnac = eprstate(QuadBlockBasis(4), asinh(√μ), 0.)
+    apply!(sagnac, modeswap(QuadBlockBasis(2)), [1,3])
     st = sagnac ⊗ sagnac ⊗ sagnac
 
-    apply!(st, beamsplitter(basis4, 0.5), [3,5, 4,6])
-    apply!(st, greenmachine(basis4, 4), [7,8, 9,10])
+    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+    apply!(st, greenmachine(QuadBlockBasis(4), 4), [7,8, 9,10])
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵗ,ηᵗ]
-    project(st, proj, [:,:,1,0,0,1,1,0,0,1,:,:]; η=η)
+    Π = projector([:,:,1,0,0,1,1,0,0,1,:,:])
+    project(st, Π; engine, η=η)
 end
 
 ## Probability of generation
 function plot_pbp3_probability()
-    proj = HybridProjector(12)
+    engine = HybridProjectionEngine(12)
     μ = range(1e-3, 1, 100)
     η = [1., 0.8, 0.5, 0.25]
-    states = pbp3.(μ, 1., η', η'; proj=proj)
+    states = pbp3.(μ, 1., η', η'; engine=engine)
     Pgen = tr.(states)
 
     plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=1)
@@ -40,10 +39,10 @@ end
 
 ## Fidelity
 function plot_pbp3_fidelity()
-    proj = HybridProjector(12)
+    engine = HybridProjectionEngine(12)
     μ = range(1e-4, 1.0, 100)
     η = [1., 0.8, 0.5, 0.25]
-    states = pbp3.(μ, 1., η', η'; proj=proj)
+    states = pbp3.(μ, 1., η', η'; engine=engine)
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in ProgressBar(CartesianIndices(states))

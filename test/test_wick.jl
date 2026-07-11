@@ -32,10 +32,10 @@ end
     using StableRNGs
     using Nemo
 
-    # HybridProjector(6) provides 24 phase-space variables; its α/β are the standard
+    # HybridProjectionEngine(6) provides 24 phase-space variables; its α/β are the standard
     # multilinear building blocks for moment polynomials
-    proj = HybridProjector(6)
-    α, β = proj.α, proj.β
+    engine = HybridProjectionEngine(6)
+    α, β = engine.α, engine.β
     CC = Nemo.ComplexField()
 
     B = rand(StableRNG(2), ComplexF64, 24, 24)
@@ -58,8 +58,8 @@ end
 @testitem "WTerms algebra" begin
     using StableRNGs
 
-    proj = HybridProjector(2)
-    α, β = proj.α, proj.β
+    engine = HybridProjectionEngine(2)
+    α, β = engine.α, engine.β
     B = rand(StableRNG(3), ComplexF64, 8, 8)
     Ainv = B + transpose(B)
 

@@ -6,28 +6,28 @@ using Plots
 
 # Alternative ZALM model
 
-function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; proj::HybridProjector)
-    basis4 = QuadBlockBasis(4)
-    basis8 = QuadBlockBasis(8)
-    st = eprstate(basis8, asinh(√μ), 0.)
-    ms = modeswap(basis4)
-    bs = beamsplitter(basis4, 0.5)
-
-    apply!(st, ms, [2,4, 5,7])
-    apply!(st, bs, [3,5, 4,6])
+function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵈ::Float64; engine::HybridProjectionEngine, parity::Symbol)
+    st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
+    apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
 
     η = [ηᵗ,ηᵗ,ηᵈ,ηᵈ,ηᵈ,ηᵈ,ηᵗ,ηᵗ]
-    Π_even = (clicks([:,:,1,0,1,0,:,:]) + clicks([:,:,0,1,0,1,:,:])) / √2
-    Π_odd = (clicks([:,:,1,0,0,1,:,:]) + clicks([:,:,0,1,1,0,:,:])) / √2
-    (project(st, proj, Π_even; η=η), project(st, proj, Π_odd; η=η))
+    if parity == :even
+        Π_even = projector([:,:,1,0,1,0,:,:]) + projector([:,:,0,1,0,1,:,:])
+        project(st, Π_even; engine, η=η)
+    elseif parity == :odd
+        Π_odd = projector([:,:,1,0,0,1,:,:]) + projector([:,:,0,1,1,0,:,:])
+        project(st, Π_odd; engine, η=η)
+    else
+        throw(ArgumentError("parity must be :even or :odd"))
+    end
 end
 
 ## Probability of generation
 function plot_alt_zalm_probability()
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     ηᵈ = 10 .^ -([0, 3, 6, 9]/10)
-    states = alt_zalm.(μ, 1., ηᵈ'; proj=proj)
+    states = alt_zalm.(μ, 1., ηᵈ'; engine=engine, parity=:odd)
 
     Pgen = tr.(states)
 
@@ -40,14 +40,14 @@ end
 
 ## Fidelity
 function plot_alt_zalm_fidelity()
-    proj = HybridProjector(8)
+    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     ηᵈ = 10 .^ -([0, 3, 6, 9]/10)
-    states = alt_zalm.(μ, 1., ηᵈ'; proj=proj)
-    ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+    states = alt_zalm.(μ, 1., ηᵈ'; engine=engine, parity=:even)
+    ϕ⁺ = (clicks([1,0,1,0]) + clicks([0,1,0,1])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in CartesianIndices(states)
-        F[I] = real(dot(ψ⁺', states[I], ψ⁺)) / tr(states[I])
+        F[I] = real(dot(ϕ⁺', states[I], ϕ⁺)) / tr(states[I])
     end
 
     plot(μ, F[:,1], label="\\eta_d = 0 dB", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright, color=1)

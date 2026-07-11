@@ -3,7 +3,7 @@
 
     GT = GroundTruth.GT
     P = GroundTruth.PARAMS["tmsv"]
-    proj = HybridProjector(2)
+    engine = HybridProjectionEngine(2)
 
     for i in 1:GroundTruth.GT_NCASES
         μ, ηᵗ, ηᵈ, ηᵇ = P[i, :]
@@ -15,10 +15,10 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         # Coincidence probability: both photons detected with efficiency ηᵈ
-        outcomes, η = [1, 1], [ηᵈ, ηᵈ]
-        @test tr(project(st, proj, outcomes; η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
+        Π, η = projector([1, 1]), [ηᵈ, ηᵈ]
+        @test tr(project(st, Π; engine, η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
         # Same result from the legacy covariance wrapped directly
         st_legacy = GroundTruth.legacy_state(cov)
-        @test tr(project(st_legacy, proj, outcomes; η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
+        @test tr(project(st_legacy, Π; engine, η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
     end
 end
