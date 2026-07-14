@@ -129,18 +129,6 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     end
 end
 
-function project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine, η::Vector{Float64}=ones(engine.mds))
-    engine.mds == nmodes(st) == nmodes(proj) == length(η) || throw(ArgumentError("Engine, state, projector, and loss vector must have the same number of modes"))
-    all(η .≥ 0) && all(η .≤ 1) || throw(ArgumentError("Loss vector must be between 0 and 1"))
-    all(proj.clicks .== 0 .|| proj.clicks .== 1 .|| proj.clicks .== -1) || throw(ArgumentError("Detector outcomes must be 0, 1, or -1"))
-    if purity(st) ≈ 1.
-        ProjectedPureGaussianState(st, proj, engine, η)
-    else
-        throw(ArgumentError("Only pure Gaussian states are currently supported."))
-    end
-end
-
-
 abstract type AbstractProjectedState end
 abstract type AbstractProjectedPureGaussianState end
 
@@ -149,7 +137,16 @@ struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
     proj::ClickProjector
     engine::HybridProjectionEngine
     η::Vector{Float64}
+    function ProjectedPureGaussianState(st::GaussianState, proj::ClickProjector, engine::HybridProjectionEngine, η::Vector{Float64})
+        engine.mds == nmodes(st) == nmodes(proj) == length(η) || throw(ArgumentError("Engine, state, projector, and loss vector must have the same number of modes"))
+        all(η .≥ 0) && all(η .≤ 1) || throw(ArgumentError("Loss vector must be between 0 and 1"))
+        all(iszero.(st.mean)) || throw(ArgumentError("Input Gaussian state must have zero displacement"))
+        purity(st) ≈ 1. || throw(ArgumentError("Input Gaussian state must be pure"))
+        all(proj.clicks .== 0 .|| proj.clicks .== 1 .|| proj.clicks .== -1) || throw(ArgumentError("Detector outcomes must be 0, 1, or -1")) # TODO: support multi-photon number outcomes
+        new(st, proj, engine, η)
+    end
 end
+project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine, η::Vector{Float64}=ones(engine.mds)) = ProjectedPureGaussianState(st, proj, engine, η)
 
 """
     tr(projected_state::ProjectedPureGaussianState)
