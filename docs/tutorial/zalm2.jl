@@ -32,6 +32,54 @@ function plot_zalm2_probability()
 end
 @time plot_zalm2_probability()
 
+## Bell-state fraction
+function plot_zalm2_Bell_state_fraction()
+    engine = HybridProjectionEngine(8)
+    μ = logrange(1e-4, 1.5, 100)
+
+    function zalm2_Pload(μ::Float64, ηR::Float64, ηT::Float64; engine::HybridProjectionEngine)
+        st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
+        apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
+        apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+
+        η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
+        Π_S = projector([:,:,1,1,0,0,:,:])
+        Π_A0 = projector([0,0,1,1,0,0,:,:])
+        Π_B0 = projector([:,:,1,1,0,0,0,0])
+        Π_S0 = projector([0,0,1,1,0,0,0,0])
+        st_S = project(st, Π_S; engine, η=η)
+        st_A0 = project(st, Π_A0; engine, η=η)
+        st_B0 = project(st, Π_B0; engine, η=η)
+        st_S0 = project(st, Π_S0; engine, η=η)
+
+        tr(st_S) - tr(st_A0) - tr(st_B0) + tr(st_S0)
+    end
+
+    function zalm2_PBell(μ::Float64, ηR::Float64, ηT::Float64; engine::HybridProjectionEngine)
+        st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
+        apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
+        apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+
+        η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
+        Π = projector([:,:,1,1,0,0,:,:])
+        st = project(st, Π; engine, η=η)
+
+        ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+        ψ⁻ = (clicks([1,0,0,1]) - clicks([0,1,1,0])) / √2
+        ϕ⁺ = (clicks([1,0,1,0]) + clicks([0,1,0,1])) / √2
+        ϕ⁻ = (clicks([1,0,1,0]) - clicks([0,1,0,1])) / √2
+
+        real(dot(ψ⁺', st, ψ⁺) + dot(ψ⁻', st, ψ⁻) + dot(ϕ⁺', st, ϕ⁺) + dot(ϕ⁻', st, ϕ⁻))
+    end
+
+    Pload = zalm2_Pload.(μ, 0.01, 0.9; engine=engine)
+    PBell = zalm2_PBell.(μ, 0.01, 0.9; engine=engine)
+    B = PBell ./ Pload
+    
+    plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", legend=:bottomright, color=1)
+end
+@time plot_zalm2_Bell_state_fraction()
+
 ## Fidelity
 function plot_zalm2_fidelity()
     engine = HybridProjectionEngine(8)
