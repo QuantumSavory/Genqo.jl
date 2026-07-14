@@ -28,7 +28,7 @@ To run a subset of test items without the full suite, use a filter with TestItem
 julia --project=test -e 'using TestItemRunner; TestItemRunner.run_tests("."; filter=ti->occursin("ZALM", ti.name))'
 ```
 
-CI (`.github/workflows/ci.yml`) runs both the Julia tests and the Python comparison tests on PRs to main.
+CI (`.github/workflows/ci.yml`) runs the Julia tests on PRs to main. The Python comparison tests (`.github/workflows/python-comparison.yml`) run only when legacy/Python-reference code is touched (`src/legacy/`, `test/python/`, `test/genqo_old_pkg/`, `python/`) or when dispatched manually from the Actions tab (`gh workflow run python-comparison.yml`).
 
 ## Architecture
 

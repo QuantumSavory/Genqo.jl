@@ -1,0 +1,50 @@
+name: Python Comparison Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - "src/legacy/**"
+      - "test/python/**"
+      - "test/genqo_old_pkg/**"
+      - "python/**"
+      - ".github/workflows/python-comparison.yml"
+  pull_request:
+    branches: [main]
+    paths:
+      - "src/legacy/**"
+      - "test/python/**"
+      - "test/genqo_old_pkg/**"
+      - "python/**"
+      - ".github/workflows/python-comparison.yml"
+
+jobs:
+  python-comparison-tests:
+    name: Python Comparison Tests
+    runs-on: ubuntu-latest
+    env:
+      PYTHON_JULIACALL_HANDLE_SIGNALS: "yes"
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: julia-actions/setup-julia@v2
+        with:
+          version: "1.12"
+
+      - uses: julia-actions/cache@v2
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install Julia dependencies
+        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+
+      - name: Install Python packages
+        run: |
+          pip install -e python/[test]
+          pip install -e test/genqo_old_pkg
+
+      - name: Run comparison tests
+        run: pytest test/python/test_compare_with_python.py

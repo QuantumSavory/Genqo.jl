@@ -16,6 +16,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improved type stability across TMSV, SPDC, ZALM, SIGSAG, and tools modules by giving explicit return types to 
 - Renamed justfile commands: `just test`/`just bench` now run the Julia test suite and the Julia benchmark suite; the Python comparison workflows moved to `just test-py`/`just bench-py` (the Julia half of the comparison benchmarks now lives in `test/python/bench.jl`).
+- The Python comparison tests moved out of the routine CI workflow into `.github/workflows/python-comparison.yml`, which runs only when legacy/Python-reference code changes or on manual dispatch.
 - `HybridProjector` renamed to `HybridProjectionEngine`; detector outcomes are now a dedicated `ClickProjector` built with `projector` (accepting `Colon`s for traced-out modes) and passed as `project(state, projector; engine, η)` with `η` optional. Projectors support only `+` (preserving idempotence — no scalar multiples or subtraction), require consistent traceout placement across all summed patterns, and `tr`/`dot` are additive over the patterns. `ClickStateKet`/`ClickStateBra` are now strictly non-negative photon-number patterns, with `norm` defined.
 
 ### Fixed
