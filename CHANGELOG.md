@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Improved type stability across TMSV, SPDC, ZALM, SIGSAG, and tools modules by giving explicit return types to 
 
+### Fixed
+
+- The Python wrapper failed to import with recent juliacall releases: `juliacall.Pkg` was removed after 0.9.31 (now activated via Julia's own `Pkg`), and newer juliacall/PythonCall versions force Julia ≤ 1.11, incompatible with Genqo's Julia 1.12 requirement (juliacall is now pinned to 0.9.31).
+
 ## [1.2.0] - 2026-04-30
 
 ### Added
