@@ -31,7 +31,7 @@ function plot_alt_zalm_probability()
 
     Pgen = tr.(states)
 
-    plot(μ, Pgen[:,1], label="\\eta_d = 0 dB", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=1)
+    plot(μ, Pgen[:,1], label="\\eta_d = 0 dB", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=1)
     plot!(μ, Pgen[:,2], label="\\eta_d = 3 dB", color=2)
     plot!(μ, Pgen[:,3], label="\\eta_d = 6 dB", color=3)
     plot!(μ, Pgen[:,4], label="\\eta_d = 9 dB", color=4)

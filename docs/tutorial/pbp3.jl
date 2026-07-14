@@ -28,7 +28,7 @@ function plot_pbp3_probability()
     states = pbp3.(μ, 1., η', η'; engine=engine)
     Pgen = tr.(states)
 
-    plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Success", legend=:bottomright, color=1)
+    plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=1)
     plot!(μ, Pgen[:,2], label="\\eta = 0.8", color=2)
     plot!(μ, Pgen[:,3], label="\\eta = 0.5", color=3)
     plot!(μ, Pgen[:,4], label="\\eta = 0.25", color=4)
