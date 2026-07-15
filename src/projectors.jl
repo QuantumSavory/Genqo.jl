@@ -4,7 +4,7 @@ import LinearAlgebra: tr, dot, norm
 using Gabs
 import Gabs: nmodes
 using QuantumOpticsBase
-import QuantumOpticsBase: fidelity
+import QuantumOpticsBase: fidelity, projector
 
 export
     # Types
@@ -82,7 +82,7 @@ struct ClickProjector <: AbstractClickOperator
         new(clicks)
     end
 end
-projector(clicks::Vector{Int}) = ClickProjector(reshape(clicks, 1, :))
+projector(clicks::Vector{Int}) = ClickProjector(reshape(clicks, 1, :)) # TODO: fix type piracy
 projector(clicks::Vector) = projector(_replace_colon.(clicks))
 function Base.show(io::IO, cp::ClickProjector)
     Base.summary(io, cp)
@@ -178,7 +178,7 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
             # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
             # tools.W() will need to be generalized
-            prod((α .* β) .^ nf) |> extract_W_terms
+            prod((α.*β).^nf ./ factorial.(nf)) |> extract_W_terms
         end
 
         Tr += W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
@@ -215,7 +215,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
             Cij = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (bcl_full, kcl_full)) do
                 prod(α .^ bcl_full) * prod(β .^ kcl_full) |> extract_W_terms
             end
-            ηweight = prod(η .^ ((bcl_full .+ kcl_full) ./ 2)) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
+            ηweight = prod(η.^((bcl_full.+kcl_full)./2) ./ (sqrt.(factorial.(bcl_full)) .* sqrt.(factorial.(kcl_full)))) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
             C += bcf * kcf * ηweight * Cij
         end
 
