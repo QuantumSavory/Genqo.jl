@@ -1,4 +1,4 @@
-# Genqo.jl: A Gaussian State Quantum Optics Modeling Engine
+# Genqo.jl: A Hybrid Gaussian/non-Gaussian Quantum Optics Modeling Engine
 
 [![DOI](https://zenodo.org/badge/1114242875.svg)](https://doi.org/10.5281/zenodo.18870771)
 
