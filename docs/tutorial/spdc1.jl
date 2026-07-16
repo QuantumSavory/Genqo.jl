@@ -44,3 +44,21 @@ function plot_spdc1_fidelity()
     plot!(μ, F, label="Genqo v2", linestyle=:dash, color=[:blue :orange :green :red])
 end
 @time plot_spdc1_fidelity()
+
+## Spin-spin density matrix after Duan-Kimble loading
+function check_spdc1_spin_density_matrix()
+    engine = HybridProjectionEngine(4)
+    μ = logrange(1e-4, 10, 4)
+    η = 10 .^ -([0, 3, 6, 9]/10)
+    states = spdc1.(μ, η'; engine=engine)
+    ρ = duankimble.(states, [[1,0,1,0]])
+    ρ_ground = spdc.spin_density_matrix.(μ, η', 1., [[1,0,1,0]])
+
+    println("Spin-spin density matrix after Duan-Kimble loading:")
+    println("Genqo v2:")
+    display(ρ[3,2])
+    println("Genqo v1 (ground truth):")
+    display(ρ_ground[3,2])
+    println("Equal? ", all(ρi.data ≈ ρi_ground for (ρi, ρi_ground) in zip(ρ, ρ_ground)) ? "✓" : "✗")
+end
+@time check_spdc1_spin_density_matrix()

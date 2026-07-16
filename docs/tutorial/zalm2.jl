@@ -1,5 +1,6 @@
 using Genqo
 using Gabs
+using QuantumOpticsBase
 
 using Plots
 
@@ -97,3 +98,25 @@ function plot_zalm2_fidelity()
     plot!(μ, F, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
 end
 @time plot_zalm2_fidelity()
+
+## Spin-spin density matrix after Duan-Kimble loading
+function check_zalm2_spin_density_matrix()
+    engine = HybridProjectionEngine(8)
+    μ = logrange(1e-4, 10, 4)
+    ηᵗ = 10 .^ -([0, 5, 10, 15]/10)
+    ηᵇ = 10 .^ -([0, 3, 6, 9]/10)
+    states = zalm2.(μ, ηᵗ', reshape(ηᵇ, (1,1,:)); engine=engine)
+    ρ = similar(states, Operator)
+    Threads.@threads for I in CartesianIndices(states)
+        ρ[I] = duankimble(states[I], [1,0,1,0])
+    end
+    ρ_ground = zalm.spin_density_matrix.(μ, ηᵗ', 1., reshape(ηᵇ, (1,1,:)), [[1,0,1,1,0,0,1,0]])
+
+    println("Spin-spin density matrix after Duan-Kimble loading:")
+    println("Genqo v2:")
+    display(ρ[3,2,2])
+    println("Genqo v1 (ground truth):")
+    display(ρ_ground[3,2,2])
+    println("Equal? ", all(ρi.data ≈ ρi_ground for (ρi, ρi_ground) in zip(ρ, ρ_ground)) ? "✓" : "✗")
+end
+@time check_zalm2_spin_density_matrix()

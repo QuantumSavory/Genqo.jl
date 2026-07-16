@@ -93,6 +93,34 @@ end
     @test dot(ψ', ps_colon, ψ) ≈ dot(ψ', ps, ψ)
 end
 
+@testitem "duankimble argument validation and basic properties" begin
+    using Gabs
+    using LinearAlgebra: diag
+
+    engine = HybridProjectionEngine(2)
+    st = eprstate(QuadBlockBasis(2), asinh(√1e-1), Float64(π))
+    ps = project(st, projector([-1, -1]); engine, η = [0.9, 0.8])
+
+    # One memory formed from the two traced-out modes: 2x2 spin density matrix
+    ρ = duankimble(ps, [1, 0])
+    @test size(ρ.data) == (2, 2)
+    @test ρ.data ≈ ρ.data'
+    @test all(real.(diag(ρ.data)) .≥ 0)
+    # Explicit mode pairing matches the default consecutive pairing of free modes
+    @test duankimble(ps, [1, 0], [(1, 2)]).data ≈ ρ.data
+
+    # One outcome per loaded mode is required
+    @test_throws ArgumentError duankimble(ps, [1, 0, 1])
+    @test_throws ArgumentError duankimble(ps, [1])
+    # All loaded modes must be traced out in the projector
+    ps_clicked = project(st, projector([1, -1]); engine)
+    @test_throws ArgumentError duankimble(ps_clicked, [1, 0], [(1, 2)])
+    # An odd number of free modes cannot be paired into memories
+    engine3 = HybridProjectionEngine(3)
+    ps3 = project(vacuumstate(QuadBlockBasis(3)), projector([-1, -1, -1]); engine = engine3)
+    @test_throws ArgumentError duankimble(ps3, [1, 0])
+end
+
 @testitem "to_fock" begin
     using Gabs
     using LinearAlgebra: diag

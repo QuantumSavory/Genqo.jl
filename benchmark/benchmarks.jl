@@ -60,6 +60,7 @@ SUITE["project.zalm_state"] = @benchmarkable zalm_state($μ)
 SUITE["project.tr"] = @benchmarkable tr(ps) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
 SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
 SUITE["project.to_fock"] = @benchmarkable to_fock(ps; cutoff = 1) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
+SUITE["project.duankimble"] = @benchmarkable duankimble(ps, $[1, 0, 1, 0]) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
 
 
 # v1 legacy sources: one headline calculation per source

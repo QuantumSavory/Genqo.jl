@@ -29,12 +29,14 @@ function generate()
     let m = params["spdc"]
         data["spdc/covariance"] = stack(tools.reorder(spdc.covariance_matrix(m[i, 1])) for i in 1:GT_NCASES)
         data["spdc/fidelity"] = [spdc.fidelity(m[i, 1], m[i, 2], m[i, 3]) for i in 1:GT_NCASES]
+        data["spdc/sdm"] = stack(spdc.spin_density_matrix(m[i, 1], m[i, 2], m[i, 3], GT_NVEC_SPDC) for i in 1:GT_NCASES)
     end
 
     let m = params["zalm"]
         data["zalm/covariance"] = stack(zalm.covariance_matrix(m[i, 1]) for i in 1:GT_NCASES)
         data["zalm/pgen"] = [zalm.probability_success(m[i, 1], m[i, 2], m[i, 3], m[i, 4], 0.0) for i in 1:GT_NCASES]
         data["zalm/fidelity"] = [zalm.fidelity(m[i, 1], m[i, 2], m[i, 3], m[i, 4]) for i in 1:GT_NCASES]
+        data["zalm/sdm"] = stack(zalm.spin_density_matrix(m[i, 1], m[i, 2], m[i, 3], m[i, 4], GT_NVEC_ZALM) for i in 1:GT_NCASES)
     end
 
     let m = params["sigsag"]

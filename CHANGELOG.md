@@ -11,6 +11,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - All-Julia test suite (TestItemRunner) validating the v2 generalized framework (`HybridProjectionEngine`/`project`/`tr`/`dot`/`fidelity`/`to_fock`, Wick kernels, click-state algebra, unitaries) for ZALM, SPDC, TMSV, and SIGSAG against ground truth precomputed with the v1 legacy code. Ground truth lives in `test/data/ground_truth.jld2`, generated deterministically (fixed `StableRNG` seed) by `test/generate_ground_truth.jl` (`just ground-truth`).
 - `benchmark/benchmarks.jl`: lean regression benchmark suite (Wick contractions, v2 probability/fidelity/density-matrix calculations, legacy per-source headliners) with fixed parameters; used by `just bench` and `just asv`.
+- `duankimble` tests and benchmark: v2 Duan-Kimble memory loading is validated against the v1 `spin_density_matrix` ground truth (Julia suite) and the reference Python implementation (`just test-py`) for SPDC and ZALM. The ZALM comparisons are marked broken/xfail pending resolution of a known factor-of-4 discrepancy.
 
 ### Changed
 

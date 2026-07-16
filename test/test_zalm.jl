@@ -42,6 +42,32 @@
     end
 end
 
+@testitem "ZALM Duan-Kimble loading vs ground truth" setup = [GroundTruth] begin
+    using Gabs
+
+    GT = GroundTruth.GT
+    P = GroundTruth.PARAMS["zalm"]
+    engine = HybridProjectionEngine(8)
+    nvec = GroundTruth.GT_NVEC_ZALM
+
+    # KNOWN DISCREPANCY (hence broken=true): v2 duankimble is currently a factor of 4
+    # too small relative to the legacy ZALM spin_density_matrix — the trailing /4
+    # normalization in duankimble matches SPDC's legacy Coef = 1/(4·D1·D2·D3), but the
+    # legacy ZALM Coef has no 1/4. Once the implementations agree, drop broken=true.
+    for i in 1:GroundTruth.GT_NCASES
+        μ, ηᵗ, ηᵈ, ηᵇ = P[i, :]
+        st = GroundTruth.legacy_state(GT["zalm/covariance"][:, :, i])
+        η = [ηᵗ * ηᵈ, ηᵗ * ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ * ηᵈ, ηᵗ * ηᵈ]
+        ps = project(st, projector([-1, -1, 1, 1, 0, 0, -1, -1]); engine, η = η)
+
+        # Loaded memories pair the signal modes (1,2) and (7,8); the BSM click
+        # pattern comes from the projector (cf. nvec[3:6])
+        ρ = duankimble(ps, nvec[[1, 2, 7, 8]])
+        @test size(ρ.data) == (4, 4)
+        @test ρ.data ≈ GT["zalm/sdm"][:, :, i] rtol = 1e-9 broken = true
+    end
+end
+
 @testitem "ZALM to_fock density matrix" setup = [GroundTruth] begin
     using Gabs
     using LinearAlgebra: diag

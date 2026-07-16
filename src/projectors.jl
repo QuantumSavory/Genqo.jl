@@ -10,7 +10,7 @@ export
     # Types
     AbstractClickState, ClickStateKet, ClickStateBra, AbstractClickOperator, ClickProjector, AbstractProjectionEngine, HybridProjectionEngine, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
     # Functions
-    clicks, projector, norm, project, tr, dot, fidelity, to_fock
+    clicks, projector, norm, project, tr, dot, fidelity, to_fock, duankimble
 
 
 # TODO: inherit from something in QuantumOptics.jl and make this a full-fledged state
@@ -94,6 +94,7 @@ end
 Base.:(==)(a::ClickProjector, b::ClickProjector) = a.clicks == b.clicks
 Base.:+(a::ClickProjector, b::ClickProjector) = ClickProjector(vcat(a.clicks, b.clicks))
 nmodes(cp::ClickProjector) = size(cp.clicks, 2)
+freemodes(cp::ClickProjector) = findall(==(-1), cp.clicks[1,:])
 
 
 abstract type AbstractProjectionEngine end
@@ -146,6 +147,7 @@ struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
         new(st, proj, engine, η)
     end
 end
+freemodes(projected_state::ProjectedPureGaussianState) = freemodes(projected_state.proj)
 project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine, η::Vector{Float64}=ones(engine.mds)) = ProjectedPureGaussianState(st, proj, engine, η)
 
 """
@@ -170,11 +172,10 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     for n in eachrow(proj.clicks)
         nf = max.(n, 0) # Filter out -1 (traceout) modes
         A, Γ = A_matrix(σ, η, n; traceout=true)
-
         invA, detA = inv(A), det(A)
         detΓ = det(Γ)
-        ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
 
+        ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
             # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
             # tools.W() will need to be generalized
@@ -203,7 +204,6 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     Dot = zero(ComplexF64)
     for n in eachrow(proj.clicks)
         A, Γ = A_matrix(σ, η, n; traceout=false)
-
         invA, detA = inv(A), det(A)
         detΓ = det(Γ)
 
@@ -245,6 +245,72 @@ function to_fock(projected_state::ProjectedPureGaussianState; cutoff::Int=2)::Op
     end
 
     dm
+end
+
+"""
+Models Duan-Kimble loading into a spin quantum memory
+"""
+function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int}, modes::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)))
+    st = projected_state.st
+    engine = projected_state.engine
+    α = engine.α
+    β = engine.β
+    proj = projected_state.proj
+    η = projected_state.η
+    mds = engine.mds
+
+    length(d) == 2length(modes) || throw(ArgumentError("Duan-Kimble loading requires one outcome per mode"))
+    count(proj.clicks[1,:] .== -1) == 2length(modes) || throw(ArgumentError("Duan-Kimble loading requires that the projected state has traceout on the modes to be loaded"))
+
+    n_mem = length(modes)
+    M = 2^n_mem
+
+    gstate = changebasis(QuadBlockBasis, st)
+    σ = gstate.covar ./ gstate.ħ
+
+    ρ = Operator(reduce(⊗, SpinBasis(1//2) for _ in 1:n_mem), zeros(ComplexF64, M, M))
+    for n in eachrow(proj.clicks)
+        A, Γ = A_matrix(σ, η, n; traceout=false)
+        invA, detA = inv(A), det(A)
+        detΓ = det(Γ)
+
+        for i in 1:mds
+            A[i,      i     ] += η[i]
+            A[i+mds,  i+mds ] += η[i]
+            A[i+2mds, i+2mds] += η[i]
+            A[i+3mds, i+3mds] += η[i]
+        end
+
+        nf = max.(n, 0) # Filter out -1 (traceout) modes
+        ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
+
+        C_base = prod((α.*β).^nf ./ factorial.(nf)) # TODO: get! from C_poly_cache. I'll need to implement * for WTerms first
+        
+        for r in 0:M-1, s in 0:M-1
+            C = copy(C_base)
+            for (a,(i,j)) in enumerate(modes)
+                C *= (if (r >> (a-1)) & 1 == 0
+                    (α[i]*√η[i] - α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] + α[j]*√η[j])^d[2a]
+                else
+                    (α[i]*√η[i] + α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] - α[j]*√η[j])^d[2a]
+                end)
+            end
+            for (b,(i,j)) in enumerate(modes)
+                C *= (if (s >> (b-1)) & 1 == 0
+                    (β[i]*√η[i] - β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2b]
+                else
+                    (β[i]*√η[i] + β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2b]
+                end)
+            end
+            ρ.data[r+1,s+1] += W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+        end
+    end
+    ρ.data ./= 2^sum(d) * 4 # TODO: get to the bottom of why SPDC has this factor of 1/4 in the Genqo v1 code but not ZALM
+    ρ
+end
+function _pair(modes::Vector{Int})
+    iseven(length(modes)) || throw(ArgumentError("Duan-Kimble loading requires an even number of modes"))
+    [(modes[2i-1], modes[2i]) for i in 1:(length(modes) ÷ 2)]
 end
 
 

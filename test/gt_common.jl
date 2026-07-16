@@ -14,6 +14,11 @@ const GT_FILE = joinpath(@__DIR__, "data", "ground_truth.jld2")
 const GT_SOURCES = ("tmsv", "spdc", "zalm", "sigsag")
 const GT_NCASES = 5 # one lossless set + 4 random sets per source
 
+# Photon-number outcomes for the spin-density-matrix / Duan-Kimble comparisons.
+# Entries stay in {0, 1}: extract_W_terms is multilinear-only.
+const GT_NVEC_SPDC = [1, 0, 1, 0]
+const GT_NVEC_ZALM = [1, 0, 1, 1, 0, 0, 1, 0] # modes 3-6 are the BSM pattern; 1, 2, 7, 8 are the loaded modes
+
 _gt_loguniform(rng, lo, hi) = exp10(log10(lo) + (log10(hi) - log10(lo)) * rand(rng))
 _gt_eta(rng) = 0.5 + 0.5 * rand(rng)
 
