@@ -110,6 +110,9 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}
     const C_poly_cache_lock::ReentrantLock # for multithreading safety
 
+    C_poly_cache_ext::Dict{Tuple{Vector{Int8}, Vector{Float64}, Vector{Int8}, Int8, Int8}, WTerms}
+    const C_poly_cache_ext_lock::ReentrantLock
+
     function HybridProjectionEngine(mds::Int)
         # Define canonical phase-space variables for the circuit
         _qai = ["qa$i" for i in 1:mds]
@@ -126,7 +129,11 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
         α = @. (qai + i * pai) / √2
         β = @. (qbi - i * pbi) / √2
 
-        new(mds, α, β, Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}(), ReentrantLock())
+        new(
+            mds, α, β,
+            Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}(), ReentrantLock(),
+            Dict{Tuple{Vector{Int8}, Vector{Float64}, Vector{Int8}, Int8, Int8}, WTerms}(), ReentrantLock(),
+        )
     end
 end
 
@@ -250,7 +257,7 @@ end
 """
 Models Duan-Kimble loading into a spin quantum memory
 """
-function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int}, modes::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)))
+function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int}, modes::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)))::Operator
     st = projected_state.st
     engine = projected_state.engine
     α = engine.α
@@ -284,23 +291,24 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
         nf = max.(n, 0) # Filter out -1 (traceout) modes
         ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
 
-        C_base = prod((α.*β).^nf ./ factorial.(nf)) # TODO: get! from C_poly_cache. I'll need to implement * for WTerms first
-        
         for r in 0:M-1, s in 0:M-1
-            C = copy(C_base)
-            for (a,(i,j)) in enumerate(modes)
-                C *= (if (r >> (a-1)) & 1 == 0
-                    (α[i]*√η[i] - α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] + α[j]*√η[j])^d[2a]
-                else
-                    (α[i]*√η[i] + α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] - α[j]*√η[j])^d[2a]
-                end)
-            end
-            for (b,(i,j)) in enumerate(modes)
-                C *= (if (s >> (b-1)) & 1 == 0
-                    (β[i]*√η[i] - β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2b]
-                else
-                    (β[i]*√η[i] + β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2b]
-                end)
+            C = @lock engine.C_poly_cache_ext_lock get!(engine.C_poly_cache_ext, (nf, η, d, r, s)) do
+                C = prod((α.*β).^nf ./ factorial.(nf))
+                for (a,(i,j)) in enumerate(modes)
+                    C *= (if (r >> (a-1)) & 1 == 0
+                        (α[i]*√η[i] - α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] + α[j]*√η[j])^d[2a]
+                    else
+                        (α[i]*√η[i] + α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] - α[j]*√η[j])^d[2a]
+                    end)
+                end
+                for (b,(i,j)) in enumerate(modes)
+                    C *= (if (s >> (b-1)) & 1 == 0
+                        (β[i]*√η[i] - β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2b]
+                    else
+                        (β[i]*√η[i] + β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2b]
+                    end)
+                end
+                C |> extract_W_terms
             end
             ρ.data[r+1,s+1] += W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
         end
