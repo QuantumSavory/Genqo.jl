@@ -4,9 +4,11 @@ using Gabs
 using Plots
 
 
+const engine = HybridProjectionEngine(4)
+
 # SPDC model
 
-function spdc1(μ::Float64, ηᵗ::Float64; engine::HybridProjectionEngine)
+function spdc1(μ::Float64, ηᵗ::Float64)
     st = eprstate(QuadBlockBasis(4), asinh(√μ), 0.)
     apply!(st, modeswap(QuadBlockBasis(2)), [2,4])
 
@@ -17,7 +19,6 @@ end
 
 ## Probability of generation
 function plot_spdc1_probability()
-    engine = HybridProjectionEngine(4)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
     states = spdc1.(μ, η'; engine=engine)
@@ -32,12 +33,11 @@ end
 
 ## Fidelity
 function plot_spdc1_fidelity()
-    engine = HybridProjectionEngine(4)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = spdc1.(μ, η'; engine=engine)
+    states = spdc1.(μ, η')
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
-    F = @. η'^2 * real(dot([ψ⁺'], states, [ψ⁺])) / tr(states) # TODO: find out where this extra factor of η^2 comes from
+    F = @. η'^2 * real(dot([ψ⁺'], states, [ψ⁺])) / tr(states) # TODO: find out where this extra factor of η² comes from
     F_ground = spdc.fidelity.(μ, η', 1.)
 
     plot(μ, F_ground, label="Genqo v1 (ground truth)", xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])
@@ -47,10 +47,9 @@ end
 
 ## Spin-spin density matrix after Duan-Kimble loading
 function check_spdc1_spin_density_matrix()
-    engine = HybridProjectionEngine(4)
     μ = logrange(1e-4, 10, 4)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = spdc1.(μ, η'; engine=engine)
+    states = spdc1.(μ, η')
     ρ = duankimble.(states, [[1,0,1,0]])
     ρ_ground = spdc.spin_density_matrix.(μ, η', 1., [[1,0,1,0]])
 

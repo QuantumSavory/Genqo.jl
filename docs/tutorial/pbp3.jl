@@ -1,13 +1,16 @@
 using Genqo
 using Gabs
+using QuantumOpticsBase
 
 using ProgressBars
 using Plots
 
 
+const engine = HybridProjectionEngine(12)
+
 # 3-source PBP model
 
-function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64; engine::HybridProjectionEngine)
+function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
     sagnac = eprstate(QuadBlockBasis(4), asinh(√μ), 0.)
     apply!(sagnac, modeswap(QuadBlockBasis(2)), [1,3])
     st = sagnac ⊗ sagnac ⊗ sagnac
@@ -22,10 +25,9 @@ end
 
 ## Probability of generation
 function plot_pbp3_probability()
-    engine = HybridProjectionEngine(12)
     μ = range(1e-3, 1, 100)
     η = [1., 0.8, 0.5, 0.25]
-    states = pbp3.(μ, 1., η', η'; engine=engine)
+    states = pbp3.(μ, 1., η', η')
     Pgen = tr.(states)
 
     plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=1)
@@ -39,10 +41,9 @@ end
 
 ## Fidelity
 function plot_pbp3_fidelity()
-    engine = HybridProjectionEngine(12)
     μ = range(1e-4, 1.0, 100)
     η = [1., 0.8, 0.5, 0.25]
-    states = pbp3.(μ, 1., η', η'; engine=engine)
+    states = pbp3.(μ, 1., η', η')
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in ProgressBar(CartesianIndices(states))

@@ -4,9 +4,11 @@ using Gabs
 using Plots
 
 
+const engine = HybridProjectionEngine(8)
+
 # Alternative ZALM model
 
-function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; engine::HybridProjectionEngine, parity::Symbol)
+function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; parity::Symbol)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
     apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
 
@@ -24,7 +26,7 @@ end
 
 # ZALM model for comparison
 
-function zalm2(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; engine::HybridProjectionEngine)
+function zalm2(μ::Float64, ηᵗ::Float64, ηᵇ::Float64)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
     apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
     apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
@@ -36,12 +38,11 @@ end
 
 ## Probability of generation
 function plot_alt_zalm_probability()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     ηᵇ = 10 .^ -([0, 3, 6, 9]/10)
     ηᵗ = 1.
-    states_alt = alt_zalm.(μ, ηᵗ, ηᵇ'; engine=engine, parity=:even)
-    states_orig = zalm2.(μ, ηᵗ, ηᵇ'; engine=engine)
+    states_alt = alt_zalm.(μ, ηᵗ, ηᵇ'; parity=:even)
+    states_orig = zalm2.(μ, ηᵗ, ηᵇ')
 
     Pgen_alt = tr.(states_alt)
     Pgen_orig = tr.(states_orig)
@@ -59,12 +60,11 @@ end
 
 ## Fidelity
 function plot_alt_zalm_fidelity()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     ηᵇ = 10 .^ -([0, 3, 6, 9]/10)
     ηᵗ = 1.
-    states_alt = alt_zalm.(μ, ηᵗ, ηᵇ'; engine=engine, parity=:odd)
-    states_orig = zalm2.(μ, ηᵗ, ηᵇ'; engine=engine)
+    states_alt = alt_zalm.(μ, ηᵗ, ηᵇ'; parity=:odd)
+    states_orig = zalm2.(μ, ηᵗ, ηᵇ')
 
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F_alt = similar(states_alt, Float64)

@@ -5,24 +5,25 @@ using QuantumOpticsBase
 using Plots
 
 
+const engine = HybridProjectionEngine(8)
+
 # ZALM model
 
-function zalm2(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; engine::HybridProjectionEngine)
+function zalm2(μ::Float64, ηR::Float64, ηT::Float64)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
     apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
     apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
 
-    η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
+    η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
     Π = projector([:,:,1,1,0,0,:,:])
     project(st, Π; engine, η=η)
 end
 
 ## Probability of generation
 function plot_zalm2_probability()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = zalm2.(μ, 1., η'; engine=engine)
+    states = zalm2.(μ, 1., η')
 
     Pgen = tr.(states)
     Pgen_ground = zalm.probability_success.(μ, 1., 1., η', 0)
@@ -35,10 +36,9 @@ end
 
 ## Bell-state fraction
 function plot_zalm2_Bell_state_fraction()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 1.5, 100)
 
-    function zalm2_Pload(μ::Float64, ηR::Float64, ηT::Float64; engine::HybridProjectionEngine)
+    function zalm2_Pload(μ::Float64, ηR::Float64, ηT::Float64)
         st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
         apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
         apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
@@ -56,7 +56,7 @@ function plot_zalm2_Bell_state_fraction()
         tr(st_S) - tr(st_A0) - tr(st_B0) + tr(st_S0)
     end
 
-    function zalm2_PBell(μ::Float64, ηR::Float64, ηT::Float64; engine::HybridProjectionEngine)
+    function zalm2_PBell(μ::Float64, ηR::Float64, ηT::Float64)
         st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
         apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
         apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
@@ -73,8 +73,8 @@ function plot_zalm2_Bell_state_fraction()
         real(dot(ψ⁺', st, ψ⁺) + dot(ψ⁻', st, ψ⁻) + dot(ϕ⁺', st, ϕ⁺) + dot(ϕ⁻', st, ϕ⁻))
     end
 
-    Pload = zalm2_Pload.(μ, 1., 0.9; engine=engine)
-    PBell = zalm2_PBell.(μ, 1., 0.9; engine=engine)
+    Pload = zalm2_Pload.(μ, 1., 0.9)
+    PBell = zalm2_PBell.(μ, 1., 0.9)
     B = PBell ./ Pload
     
     plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", legend=:bottomright, color=1)
@@ -83,10 +83,9 @@ end
 
 ## Fidelity
 function plot_zalm2_fidelity()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = zalm2.(μ, 1., η'; engine=engine)
+    states = zalm2.(μ, 1., η')
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = similar(states, Float64)
     Threads.@threads for I in CartesianIndices(states)
@@ -101,16 +100,15 @@ end
 
 ## Spin-spin density matrix after Duan-Kimble loading
 function check_zalm2_spin_density_matrix()
-    engine = HybridProjectionEngine(8)
     μ = logrange(1e-4, 10, 4)
-    ηᵗ = 10 .^ -([0, 5, 10, 15]/10)
-    ηᵇ = 10 .^ -([0, 3, 6, 9]/10)
-    states = zalm2.(μ, ηᵗ', reshape(ηᵇ, (1,1,:)); engine=engine)
+    ηR = 10 .^ -([0, 5, 10, 15]/10)
+    ηT = 10 .^ -([0, 3, 6, 9]/10)
+    states = zalm2.(μ, ηR', reshape(ηT, (1,1,:)))
     ρ = similar(states, Operator)
     Threads.@threads for I in CartesianIndices(states)
         ρ[I] = duankimble(states[I], [1,0,1,0])
     end
-    ρ_ground = zalm.spin_density_matrix.(μ, ηᵗ', 1., reshape(ηᵇ, (1,1,:)), [[1,0,1,1,0,0,1,0]])
+    ρ_ground = zalm.spin_density_matrix.(μ, ηR', 1., reshape(ηT, (1,1,:)), [[1,0,1,1,0,0,1,0]])
 
     println("Spin-spin density matrix after Duan-Kimble loading:")
     println("Genqo v2:")
