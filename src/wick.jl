@@ -61,6 +61,9 @@ struct WBucket{N}
     coeffs::Vector{ComplexF64}
     indices::Vector{NTuple{N,Int}}
 end
+function Base.show(io::IO, b::WBucket{N}) where {N}
+    print(io, "$N-factor Wick bucket with $(length(b.indices)) index sets")
+end
 Base.:*(a::C, b::WBucket{N}) where {C<:Number,N} = WBucket{N}(a * b.coeffs, b.indices)
 Base.:*(a::WBucket{N}, b::C) where {C<:Number,N} = WBucket{N}(b * a.coeffs, a.indices)
 
