@@ -46,6 +46,7 @@ function _wick_partitions(N::Int8)::Array{Int8,3}
     @assert idx == n_parts + 1 "Expected to fill all $n_parts partitions, but filled $(idx-1)"
     return result
 end
+_wick_partitions(N::Int)::Array{Int8,3} = _wick_partitions(Int8(N))
 const _wick_partitions_cache = Ref(Dict{Int8, Array{Int8,3}}())
 wick_partitions(N::Int8)::Array{Int8,3} = get!(() -> _wick_partitions(N), _wick_partitions_cache[], N)
 wick_partitions(N::Int)::Array{Int8,3} = wick_partitions(Int8(N)) # dispatch to Int8 version for caching
