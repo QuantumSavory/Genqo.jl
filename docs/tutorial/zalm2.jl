@@ -118,3 +118,34 @@ function check_zalm2_spin_density_matrix()
     println("Equal? ", all(ρi.data ≈ ρi_ground for (ρi, ρi_ground) in zip(ρ, ρ_ground)) ? "✓" : "✗")
 end
 @time check_zalm2_spin_density_matrix()
+
+## Distillable entanglement rate
+function plot_zalm2_distillable_entanglement_rate()
+    μ = logrange(1e-4, 10, 100)
+    ηR = 0.01
+    ηT = 1.0:-0.1:0.6
+    states = zalm2.(μ, ηR, ηT')
+    ρAB = similar(states, Operator)
+    Pgen = similar(states, Float64)
+    Threads.@threads for I in CartesianIndices(states)
+        ρAB[I] = duankimble(states[I], [1,0,1,0]) * 4
+        Pgen[I] = tr(ρAB[I])
+        ρAB[I] /= Pgen[I]
+    end
+
+    # Compute Hashing bound
+    SρAB = @. entropy_vn(ρAB) |> real
+    SρA = @. entropy_vn(ptrace(ρAB, 2)) |> real
+    SρB = @. entropy_vn(ptrace(ρAB, 1)) |> real
+    I = max.(SρA - SρAB, SρB - SρAB)
+
+    # Compute distillable entanglement rate
+    R = max.(I .* Pgen, 1e-20) # send nonpositive numbers to 1e-20 for log scale
+
+    plot(μ, R[:,1], label="\\eta_T = $(ηT[1])", xlabel="Mean Photon Number Per Mode", ylabel="Distillable Entanglement Rate", xscale=:log10, yscale=:log10, xticks=10. .^ (-4:1), yticks=10. .^ (-14:2:-4), xlim=[1e-4,1e1], ylim=[1e-14,1e-4], legend=:topleft)
+    plot!(μ, R[:,2], label="\\eta_T = $(ηT[2])")
+    plot!(μ, R[:,3], label="\\eta_T = $(ηT[3])")
+    plot!(μ, R[:,4], label="\\eta_T = $(ηT[4])")
+    plot!(μ, R[:,5], label="\\eta_T = $(ηT[5])")
+end
+@time plot_zalm2_distillable_entanglement_rate()
