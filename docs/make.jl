@@ -22,3 +22,8 @@ makedocs(
     checkdocs = :exports,
     plugins=[bib],
 )
+
+deploydocs(
+    repo = "github.com/QuantumSavory/Genqo.jl.git",
+    push_preview = true,
+)
