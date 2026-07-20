@@ -37,7 +37,7 @@ function plot_spdc1_fidelity()
     η = 10 .^ -([0, 3, 6, 9]/10)
     states = spdc1.(μ, η')
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
-    F = @. η'^2 * real(dot([ψ⁺'], states, [ψ⁺])) / tr(states) # TODO: find out where this extra factor of η² comes from
+    F = @. real(dot([ψ⁺'], states, [ψ⁺])) / tr(states)
     F_ground = spdc.fidelity.(μ, η', 1.)
 
     plot(μ, F_ground, label="Genqo v1 (ground truth)", xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])

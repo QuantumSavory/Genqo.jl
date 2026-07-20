@@ -314,7 +314,7 @@ function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
         W(moment_terms.bell_ba, Ainv1) +
         W(moment_terms.bell_bb, Ainv1)
 
-    N1 = (ηᵗ * ηᵈ)^4
+    N1 = (ηᵗ * ηᵈ)^2
 
     D2 = detΓ^(1/4)
     D3 = conj(detΓ)^(1/4)

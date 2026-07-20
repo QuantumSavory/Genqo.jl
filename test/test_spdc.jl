@@ -17,11 +17,8 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         # Bell-state overlap of the raw (unheralded) source: all four modes kept.
-        # The legacy fidelity carries an extra (ηᵗηᵈ)² prefactor — (ηᵗηᵈ)⁴ in total —
-        # relative to v2's per-photon loss weighting η^((bra+ket)/2), which matches the
-        # convention used by the ZALM/SIGSAG legacy code.
         ps = project(st, projector([-1, -1, -1, -1]); engine, η = fill(ηᵗ * ηᵈ, 4))
-        @test real(dot(ψ⁺', ps, ψ⁺)) * (ηᵗ * ηᵈ)^2 ≈ GT["spdc/fidelity"][i] rtol = 1e-9
+        @test real(dot(ψ⁺', ps, ψ⁺)) ≈ GT["spdc/fidelity"][i] rtol = 1e-9
     end
 end
 
