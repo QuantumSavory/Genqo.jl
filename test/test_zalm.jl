@@ -50,10 +50,6 @@ end
     engine = HybridProjectionEngine(8)
     nvec = GroundTruth.GT_NVEC_ZALM
 
-    # KNOWN DISCREPANCY (hence broken=true): v2 duankimble is currently a factor of 4
-    # too small relative to the legacy ZALM spin_density_matrix — the trailing /4
-    # normalization in duankimble matches SPDC's legacy Coef = 1/(4·D1·D2·D3), but the
-    # legacy ZALM Coef has no 1/4. Once the implementations agree, drop broken=true.
     for i in 1:GroundTruth.GT_NCASES
         μ, ηᵗ, ηᵈ, ηᵇ = P[i, :]
         st = GroundTruth.legacy_state(GT["zalm/covariance"][:, :, i])
@@ -62,9 +58,9 @@ end
 
         # Loaded memories pair the signal modes (1,2) and (7,8); the BSM click
         # pattern comes from the projector (cf. nvec[3:6])
-        ρ = duankimble(ps, nvec[[1, 2, 7, 8]])
+        ρ = duankimble(ps, nvec[[1, 2, 7, 8]]) * 4 # factor of 4 to account for 4 accepted click patterns
         @test size(ρ.data) == (4, 4)
-        @test ρ.data ≈ GT["zalm/sdm"][:, :, i] rtol = 1e-9 broken = true
+        @test ρ.data ≈ GT["zalm/sdm"][:, :, i] rtol = 1e-9
     end
 end
 
