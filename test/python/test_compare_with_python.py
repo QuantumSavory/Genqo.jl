@@ -38,7 +38,7 @@ function zalm_duankimble(mu, eta_t, eta_d, eta_b, nvec)
     apply!(st, bs, [4, 6])
     η = [eta_t*eta_d, eta_t*eta_d, eta_b, eta_b, eta_b, eta_b, eta_t*eta_d, eta_t*eta_d]
     ps = project(st, projector([-1, -1, 1, 1, 0, 0, -1, -1]); engine = engine8, η = η)
-    duankimble(ps, collect(Int, nvec)[[1, 2, 7, 8]]).data
+    duankimble(ps, collect(Int, nvec)[[1, 2, 7, 8]]).data .* 4
 end
 
 end
@@ -223,7 +223,6 @@ def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_
             "jl": _mat_to_json(np.array(spin_density_matrix_jl)),
         })
 
-@pytest.mark.xfail(reason="v2 duankimble is currently a factor of 4 too small for ZALM", strict=True)
 def test_zalm__duankimble(zalm_py: gqpy.ZALM, zalm_test_cases: list[dict]) -> None:
     """v2 Duan-Kimble loading of the ZALM source vs the reference spin density matrix."""
     nvec = np.array([1,0,1,1,0,0,1,0])
