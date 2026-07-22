@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Reformulate A matrix and associated Wick contractions to operate directly in the [α β* α* β] basis instead of [qα pα qβ pβ]. This exponentially reduces the number of terms in the expanded moment polynomial, which linearly impacts speed.
 - Improved type stability across TMSV, SPDC, ZALM, SIGSAG, and tools modules by giving explicit return types to 
 - Renamed justfile commands: `just test`/`just bench` now run the Julia test suite and the Julia benchmark suite; the Python comparison workflows moved to `just test-py`/`just bench-py` (the Julia half of the comparison benchmarks now lives in `test/python/bench.jl`).
 - The Python comparison tests moved out of the routine CI workflow into `.github/workflows/python-comparison.yml`, which runs only when legacy/Python-reference code changes or on manual dispatch.

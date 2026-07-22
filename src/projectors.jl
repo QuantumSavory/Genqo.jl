@@ -114,20 +114,15 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     const C_poly_cache_ext_lock::ReentrantLock
 
     function HybridProjectionEngine(mds::Int)
-        # Define canonical phase-space variables for the circuit
-        _qai = ["qa$i" for i in 1:mds]
-        _pai = ["pa$i" for i in 1:mds]
-        _qbi = ["qb$i" for i in 1:mds]
-        _pbi = ["pb$i" for i in 1:mds]
-        all_qps = hcat(_qai, _pai, _qbi, _pbi)
+        # Define phase-space variables for the circuit
+        _αi = ["α$i" for i in 1:mds]
+        _βi = ["β$i" for i in 1:mds]
         CC = ComplexField()
-        i = onei(CC) # Imaginary unit in CC ring
-        R, generators = polynomial_ring(CC, all_qps)
-        (qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
+        R, generators = polynomial_ring(CC, hcat(_αi, _βi))
 
-        # Define the α and β* vectors (note that we pre-conjugate β)
-        α = @. (qai + i * pai) / √2
-        β = @. (qbi - i * pbi) / √2
+        # Define the α and β* vectors (note that β is understood to refer to the β* block)
+        α = generators[:,1]
+        β = generators[:,2]
 
         new(
             mds, α, β,
@@ -178,9 +173,8 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     Tr = zero(ComplexF64)
     for n in eachrow(proj.clicks)
         nf = max.(n, 0) # Filter out -1 (traceout) modes
-        A, Γ = A_matrix(σ, η, n; traceout=true)
-        invA, detA = inv(A), det(A)
-        detΓ = det(Γ)
+        A, denom = A_matrix(σ, η, n; traceout=true)
+        invA = inv(A)
 
         ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
@@ -189,7 +183,7 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
             prod((α.*β).^nf ./ factorial.(nf)) |> extract_W_terms
         end
 
-        Tr += W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+        Tr += W(C, invA) * ηweight / denom
     end
 
     @assert abs(imag(Tr)) ≤ 1e-10 * abs(Tr) "Trace of a density matrix should be real, but got $Tr"
@@ -210,9 +204,8 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
 
     Dot = zero(ComplexF64)
     for n in eachrow(proj.clicks)
-        A, Γ = A_matrix(σ, η, n; traceout=false)
-        invA, detA = inv(A), det(A)
-        detΓ = det(Γ)
+        A, denom = A_matrix(σ, η, n; traceout=false)
+        invA = inv(A)
 
         C = zero(WTerms{Tuple{}}) # Start with empty WTerms
         for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
@@ -226,7 +219,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
             C += bcf * kcf * ηweight * Cij
         end
 
-        Dot += W(C, invA) / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+        Dot += W(C, invA) / denom
     end
     Dot
 end
@@ -277,9 +270,8 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
 
     ρ = Operator(reduce(⊗, SpinBasis(1//2) for _ in 1:n_mem), zeros(ComplexF64, M, M))
     for n in eachrow(proj.clicks)
-        A, Γ = A_matrix(σ, η, n; traceout=false)
-        invA, detA = inv(A), det(A)
-        detΓ = det(Γ)
+        A, denom = A_matrix(σ, η, n; traceout=false)
+        invA = inv(A)
 
         for i in 1:mds
             A[i,      i     ] += η[i]
@@ -310,10 +302,10 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
                 end
                 C |> extract_W_terms
             end
-            ρ.data[r+1,s+1] += W(C, invA) * ηweight / (sqrt(detA)*detΓ^0.25*conj(detΓ)^0.25)
+            ρ.data[r+1,s+1] += W(C, invA) * ηweight / denom
         end
     end
-    ρ.data ./= 2^sum(d) * 4 # TODO: get to the bottom of why SPDC has this factor of 1/4 in the Genqo v1 code but not ZALM
+    ρ.data ./= 2^sum(d) * 4
     ρ
 end
 function _pair(modes::Vector{Int})
@@ -322,8 +314,11 @@ function _pair(modes::Vector{Int})
 end
 
 
-function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Matrix{Float64}}
+function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::SubArray{Int}; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Float64}
+    size(σ, 1) == size(σ, 2) || throw(ArgumentError("Covariance matrix must be square"))
     mds = size(σ, 1) ÷ 2
+    length(n) == length(η) == mds || throw(ArgumentError("Length of n and η must match number of modes in covariance matrix"))
+
     Γ = σ + 0.5*I
     Γinv = inv(Γ)
 
@@ -334,43 +329,28 @@ function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray; tr
     cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
     b  = @view Γinv[mds+1:2mds, mds+1:2mds]
 
-    # Compute K matrix (block diagonal [BB, conj(BB)]) from Γinv blocks
+    @assert 0.5 * (a + b - im*(c - cᵀ)) ≈ I # Ã purity check
+
+    # Compute A matrix from blocks (block ordering: [α β* α* β])
+    # TODO: is this possible with a 2mds×2mds matrix in [α β*] ordering? C polynomials never have α* or β terms in them. Tricky part is we need A⁻¹, not just A. We also need a way to calculate det(A)
     A = zeros(ComplexF64, 4mds, 4mds)
-    @views @. A[1:mds,      1:mds     ] = 0.5*a  + (0.25im)*(c + cᵀ)
-    @views @. A[1:mds,      mds+1:2mds] = 0.5*c  - (0.25im)*(a - b)
-    @views @. A[mds+1:2mds, 1:mds     ] = 0.5*cᵀ - (0.25im)*(a - b)
-    @views @. A[mds+1:2mds, mds+1:2mds] = 0.5*b  - (0.25im)*(c + cᵀ)
-    @views @. A[2mds+1:4mds, 2mds+1:4mds] = conj(A[1:2mds, 1:2mds])
-    # TODO: can we eliminate this copy with views of K in the W() function? Or perhaps even a new type for this specific weird block structure of A = [a b; bᵀ a*]?
-    # TODO: can we do one bounds check up front and @inbounds the whole thing below?
+    @views @. A[2mds+1:3mds, 2mds+1:3mds] = 0.5 * (a - b + im*(c + cᵀ)) # C̃
+    @views @. A[3mds+1:4mds, 3mds+1:4mds] = 0.5 * (a - b - im*(c + cᵀ)) # C̃*
     
-    # Add G matrix to K and return A = K + G
-    A += 0.5*I
     for (i, ni) in enumerate(n)
-        if traceout && ni == -1
-            # No detector means we trace out the mode
-            # Expansion of αβ*
-            A[i,      i+2mds] += -0.5
-            A[i,      i+3mds] +=  0.5im
-            A[i+mds,  i+2mds] += -0.5im
-            A[i+mds,  i+3mds] += -0.5
-            A[i+2mds, i     ] += -0.5
-            A[i+2mds, i+mds ] += -0.5im
-            A[i+3mds, i     ] +=  0.5im
-            A[i+3mds, i+mds ] += -0.5
-        else
-            # Fock term (αβ*)ⁿ/n! is handled in the moment polynomial C, as it is not inside an exp()
-            # Expansion of αβ*(1 - η)
-            li = 1 - η[i]
-            A[i,      i+2mds] += -0.5   * li
-            A[i,      i+3mds] +=  0.5im * li
-            A[i+mds,  i+2mds] += -0.5im * li
-            A[i+mds,  i+3mds] += -0.5   * li
-            A[i+2mds, i     ] += -0.5   * li
-            A[i+2mds, i+mds ] += -0.5im * li
-            A[i+3mds, i     ] +=  0.5im * li
-            A[i+3mds, i+mds ] += -0.5   * li
-        end
+        # Expansion of αβ*(1 - η), or αβ* for A_pgen transmitted modes: blocks (1,2) and (2,1)
+        l = traceout && ni == -1 ? -one(ComplexF64) : ComplexF64(η[i] - 1.)
+        A[i,     i+mds] = l
+        A[i+mds, i    ] = l
+
+        # Identity: blocks (1,3) (2,4) (3,1) and (4,2)
+        A[i,      i+2mds] = one(ComplexF64)
+        A[i+mds,  i+3mds] = one(ComplexF64)
+        A[i+2mds, i     ] = one(ComplexF64)
+        A[i+3mds, i+mds ] = one(ComplexF64)
     end
-    (A, Γ)
+
+    detΓ = det(Γ)
+    denom = sqrt(det(A)) * detΓ^0.25 * conj(detΓ)^0.25
+    (A, real(denom)) # sometimes denom ends up with small (1e-37im) imaginary part
 end
