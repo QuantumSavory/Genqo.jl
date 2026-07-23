@@ -394,13 +394,14 @@ function plot_rate_dist_entanglement_with_Nm_3D()
     for s in surfaces
         surface!(ax, μ_vals, ηT_vals, s.data;
             color = fill(s.color, size(s.data)), shading = NoShading)
-    end
+    end  
 
     Legend(fig[2, 1],
         [PolyElement(color = s.color) for s in surfaces],
         [s.name for s in surfaces];
         orientation = :horizontal,
     )
+    rowgap!(fig.layout, 30)
 
     fig
 end
@@ -466,6 +467,8 @@ function plot_fidelity_with_Nm_3D()
         orientation = :horizontal,
     )
 
+    rowgap!(fig.layout, 30) 
+
     fig
 end
 
@@ -522,13 +525,13 @@ function plot_bell_fraction_with_Nm_3D()
         surface!(ax, μ_vals, ηT_vals, s.data;
             color = fill(s.color, size(s.data)), shading = NoShading)
     end
-    
+
     Legend(fig[2, 1],
         [PolyElement(color = s.color) for s in surfaces],
         [s.name for s in surfaces];
         orientation = :horizontal,
     )
-
+    rowgap!(fig.layout, 30)
     fig
 end
 
