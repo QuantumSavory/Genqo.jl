@@ -6,6 +6,7 @@ import LinearAlgebra: tr, dot, norm
 using SpecialFunctions: binomial
 using Colors 
 using GLMakie  
+#3d stuff
 
 #EH function formalism: 
 function pmf_zP(N_I::Int, q::Float64)
