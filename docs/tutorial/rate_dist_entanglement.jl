@@ -377,6 +377,7 @@ function plot_rate_dist_entanglement_with_Nm_3D()
         xticks = LinearTicks(10),
         yticks = LinearTicks(6),
         zticks = LinearTicks(5),
+        protrusions = (30, 30, 30, 30),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
@@ -442,6 +443,7 @@ function plot_fidelity_with_Nm_3D()
         xticks = LinearTicks(10),
         yticks = LinearTicks(6),
         zticks = LinearTicks(5),
+        protrusions = (30, 30, 30, 30),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
@@ -507,6 +509,7 @@ function plot_bell_fraction_with_Nm_3D()
         xticks = LinearTicks(10),
         yticks = LinearTicks(6),
         zticks = LinearTicks(5),
+        protrusions = (30, 30, 30, 30),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
