@@ -352,67 +352,6 @@ function plot_rate_dist_entanglement_with_Nm_3D()
     Rp = 10e9
     N_I = 10
     N_M = 1
-    μ_vals = logrange(1e-4, 2, 100)
-
-    zalm_rates = [zalm_rate_dist_entanglement_numerical(μ, ηR, ηT, Rp, N_I, N_M; engine=zalm_engine)
-                  for μ in μ_vals, ηT in ηT_vals]
-    chahine_rates = [chahine_rate_dist_entanglement_numerical(μ, ηR, ηT, Rp, N_I, N_M; engine=chahine_engine)
-                     for μ in μ_vals, ηT in ηT_vals]
-    # spdc_rates = [spdc_rate_dist_entanglement_numerical(μ, ηR, Rp, N_M; engine=spdc_engine) for μ in μ_vals, ηT in ηT_vals]
-    #spcd_rates_symbolic = [spdc_rate_dist_entanglement_symbolic(μ, ηR, Rp, N_M) for μ in μ_vals, ηT in ηT_vals]
-
-    #pbp4_rates = [pbp4_rate_dist_entanglement(μ, ηR, ηT, Rp, N_I, N_M; engine=pbp4_engine) for μ in μ_vals, ηT in ηT_vals]
-    zmax = maximum(filter(!isnan, vcat(vec(zalm_rates), vec(chahine_rates))))
-
-    fig = Figure(size = (1000, 700))
-
-    ax = Axis3(fig[1, 1];
-        xlabel = "Mean photon number μ",
-        ylabel = "Transmission loss ηT",
-        zlabel = "Rate (bits/s)",
-        title  = "Rate of distributed entanglement vs μ and ηT (NI = $(N_I), NM = $(N_M))",
-        azimuth   = 35 * π/180,
-        elevation = 25 * π/180,
-        limits = (nothing, nothing, (0, zmax)),
-    )
-
-    zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
-    chahine_color = fill(RGBAf(1.0, 0.271, 0.0, 0.8), size(chahine_rates))
-    spdc_color = fill(RGBAf(0.85, 0.74, 0.0, 0.4))
-
-    surfaces = [
-        (name = "ZALM",    data = zalm_rates,    color = RGBAf(0.18, 0.545, 0.341, 0.8)),
-        (name = "Chahine", data = chahine_rates, color = RGBAf(1.0,  0.271, 0.0,   0.8)),
-       #(name = "PBP4", data  = pbp4_rates, color = RGBAf(0.85, 0.74,  0.0,   0.4) )
-        #(name = "SPDC",    data = spdc_rates,    color = RGBAf(0.85, 0.74,  0.0,   0.4)),
-       #(name = "SPDC symbolic", data = spcd_rates_symbolic,  color = RGBAf(1.0,  0.271, 0.0,   0.8))
-    ]
-
-    for s in surfaces
-        surface!(ax, μ_vals, ηT_vals, s.data;
-            color = fill(s.color, size(s.data)), shading = NoShading)
-    end
-
-    Legend(fig[2, 1],
-        [PolyElement(color = s.color) for s in surfaces],
-        [s.name for s in surfaces];
-        orientation = :horizontal,
-    )
-
-    fig
-end
-
-function plot_rate_dist_entanglement_with_Nm_3D()
-    zalm_engine    = HybridProjectionEngine(8)
-    chahine_engine = HybridProjectionEngine(6)
-    spdc_engine = HybridProjectionEngine(4)
-    pbp4_engine = HybridProjectionEngine(16)
-
-    ηR = 0.01
-    ηT_vals = logrange(0.7, 1, 100)
-    Rp = 10e9
-    N_I = 10
-    N_M = 1
     μ_vals = logrange(1e-4, 10, 100)
 
     zalm_rates = [zalm_rate_dist_entanglement_numerical(μ, ηR, ηT, Rp, N_I, N_M; engine=zalm_engine)
@@ -424,16 +363,7 @@ function plot_rate_dist_entanglement_with_Nm_3D()
 
     #pbp4_rates = [pbp4_rate_dist_entanglement(μ, ηR, ηT, Rp, N_I, N_M; engine=pbp4_engine) for μ in μ_vals, ηT in ηT_vals]
     zmax = maximum(filter(!isnan, vcat(vec(zalm_rates), vec(chahine_rates))))
-        
-    function source_roots(ηT)
-        1 / ηT
-    end
-    z_vals = logrange(1e-4, zmax, 50)  
-
-    μ_curtain_matrix  = [source_roots(ηT) for _ in z_vals, ηT in ηT_vals]
-    ηT_curtain_matrix = [ηT               for _ in z_vals, ηT in ηT_vals]
-    z_curtain_matrix  = [z                for z  in z_vals, _  in ηT_vals]
-
+     
     fig = Figure(size = (1000, 700))
 
     ax = Axis3(fig[1, 1];
@@ -444,6 +374,9 @@ function plot_rate_dist_entanglement_with_Nm_3D()
         azimuth   = 35 * π/180,
         elevation = 25 * π/180,
         limits = (nothing, nothing, (0, zmax)),
+        xticks = LinearTicks(10),
+        yticks = LinearTicks(6),
+        zticks = LinearTicks(5),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
@@ -462,10 +395,6 @@ function plot_rate_dist_entanglement_with_Nm_3D()
         surface!(ax, μ_vals, ηT_vals, s.data;
             color = fill(s.color, size(s.data)), shading = NoShading)
     end
-        
-    curtain_color = RGBAf(0.3, 0.5, 0.9, 0.5)
-    surface!(ax, μ_curtain_matrix, ηT_curtain_matrix, z_curtain_matrix;
-        color = fill(curtain_color, size(z_curtain_matrix)), shading = NoShading)
 
     Legend(fig[2, 1],
         [PolyElement(color = s.color) for s in surfaces],
@@ -475,7 +404,6 @@ function plot_rate_dist_entanglement_with_Nm_3D()
 
     fig
 end
-
 
 function plot_fidelity_with_Nm_3D()
     zalm_engine = HybridProjectionEngine(8)
@@ -499,26 +427,20 @@ function plot_fidelity_with_Nm_3D()
 
     #pbp4_rates = [pbp4_rate_dist_entanglement(μ, ηR, ηT, Rp, N_I, N_M; engine=pbp4_engine) for μ in μ_vals, ηT in ηT_vals]
     zmax = maximum(filter(!isnan, vcat(vec(zalm_rates), vec(chahine_rates))))
-              
-    function source_roots(ηT)
-        1 / ηT
-    end
-    z_vals = logrange(1e-4, zmax, 50)  
-
-    μ_curtain_matrix  = [source_roots(ηT) for _ in z_vals, ηT in ηT_vals]
-    ηT_curtain_matrix = [ηT               for _ in z_vals, ηT in ηT_vals]
-    z_curtain_matrix  = [z                for z  in z_vals, _  in ηT_vals]
 
     fig = Figure(size = (1000, 700))
 
     ax = Axis3(fig[1, 1];
         xlabel = "Mean photon number μ",
         ylabel = "Transmission loss ηT",
-        zlabel = "Rate (bits/s)",
+        zlabel = "Fidelity",
         title  = "Bell fidelity vs μ and ηT (NI = $(N_I), NM = $(N_M))",
         azimuth   = 35 * π/180,
         elevation = 25 * π/180,
         limits = (nothing, nothing, (0, zmax)),
+        xticks = LinearTicks(10),
+        yticks = LinearTicks(6),
+        zticks = LinearTicks(5),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
@@ -537,10 +459,6 @@ function plot_fidelity_with_Nm_3D()
         surface!(ax, μ_vals, ηT_vals, s.data;
             color = fill(s.color, size(s.data)), shading = NoShading)
     end
-
-    curtain_color = RGBAf(0.3, 0.5, 0.9, 0.5)
-    surface!(ax, μ_curtain_matrix, ηT_curtain_matrix, z_curtain_matrix;
-        color = fill(curtain_color, size(z_curtain_matrix)), shading = NoShading)
 
     Legend(fig[2, 1],
         [PolyElement(color = s.color) for s in surfaces],
@@ -572,27 +490,20 @@ function plot_bell_fraction_with_Nm_3D()
     #spcd_rates_symbolic = [spdc_rate_dist_entanglement_symbolic(μ, ηR, Rp, N_M) for μ in μ_vals, ηT in ηT_vals]
     #pbp4_rates = [pbp4_rate_dist_entanglement(μ, ηR, ηT, Rp, N_I, N_M; engine=pbp4_engine) for μ in μ_vals, ηT in ηT_vals]
     zmax = maximum(filter(!isnan, vcat(vec(zalm_rates), vec(chahine_rates))))
-    
-   
-    function source_roots(ηT)
-        1 / ηT
-    end
-    z_vals = logrange(1e-4, zmax, 50)  
-
-    μ_curtain_matrix  = [source_roots(ηT) for _ in z_vals, ηT in ηT_vals]
-    ηT_curtain_matrix = [ηT               for _ in z_vals, ηT in ηT_vals]
-    z_curtain_matrix  = [z                for z  in z_vals, _  in ηT_vals]
-
+    zmin = minimum(filter(!isnan, vcat(vec(zalm_rates), vec(chahine_rates))))
     fig = Figure(size = (1000, 700))
 
     ax = Axis3(fig[1, 1];
         xlabel = "Mean photon number μ",
         ylabel = "Transmission loss ηT",
-        zlabel = "Rate (bits/s)",
-        title  = "Bell fidelity vs μ and ηT (NI = $(N_I), NM = $(N_M))",
+        zlabel = "Bell Fraction",
+        title  = "Bell purity vs μ and ηT (NI = $(N_I), NM = $(N_M))",
         azimuth   = 35 * π/180,
         elevation = 25 * π/180,
-        limits = (nothing, nothing, (0, zmax)),
+        limits = (nothing, nothing, (zmin, zmax)),
+        xticks = LinearTicks(10),
+        yticks = LinearTicks(6),
+        zticks = LinearTicks(5),
     )
 
     zalm_color    = fill(RGBAf(0.18, 0.545, 0.341, 0.8), size(zalm_rates))    
@@ -612,15 +523,85 @@ function plot_bell_fraction_with_Nm_3D()
             color = fill(s.color, size(s.data)), shading = NoShading)
     end
     
-    curtain_color = RGBAf(0.3, 0.5, 0.9, 0.5)
-    surface!(ax, μ_curtain_matrix, ηT_curtain_matrix, z_curtain_matrix;
-        color = fill(curtain_color, size(z_curtain_matrix)), shading = NoShading)
-
     Legend(fig[2, 1],
         [PolyElement(color = s.color) for s in surfaces],
         [s.name for s in surfaces];
         orientation = :horizontal,
     )
+
+    fig
+end
+
+function plot_metrics_comparison_with_3D()
+    zalm_engine    = HybridProjectionEngine(8)
+    chahine_engine = HybridProjectionEngine(6)
+
+    ηR = 0.01
+    ηT_vals = logrange(0.7, 1, 100)
+    Rp = 10e9
+    N_I = 10
+    N_M = 1
+    μ_vals = logrange(1e-4, 10, 100)
+
+    # One entry per metric/panel: name, how to compute each engine's values, z label
+    metrics = [
+        (
+            name   = "Rate",
+            zlabel = "Rate (bits/s)",
+            zalm_fn    = (μ, ηT) -> zalm_rate_dist_entanglement_numerical(μ, ηR, ηT, Rp, N_I, N_M; engine=zalm_engine),
+            chahine_fn = (μ, ηT) -> chahine_rate_dist_entanglement_numerical(μ, ηR, ηT, Rp, N_I, N_M; engine=chahine_engine),
+        ),
+        (
+            name   = "Bell fraction",
+            zlabel = "Bell fraction",
+            zalm_fn    = (μ, ηT) -> zalm_bell_fraction_numerical(μ, ηR, ηT; engine=zalm_engine),
+            chahine_fn = (μ, ηT) -> chahine_bell_fraction_numerical(μ, ηR, ηT; engine=chahine_engine),
+        ),
+        (
+            name   = "Fidelity",
+            zlabel = "Fidelity",
+            zalm_fn    = (μ, ηT) -> zalm_bell_fidelity_numerical(μ, ηR, ηT; engine=zalm_engine),
+            chahine_fn = (μ, ηT) -> chahine_bell_fidelity_numerical(μ, ηR, ηT; engine=chahine_engine),
+        ),
+    ]
+
+    fig = Figure(size = (1800, 700))
+
+    for (i, m) in enumerate(metrics)
+        zalm_data    = [m.zalm_fn(μ, ηT)    for μ in μ_vals, ηT in ηT_vals]
+        chahine_data = [m.chahine_fn(μ, ηT) for μ in μ_vals, ηT in ηT_vals]
+
+        zmax = maximum(filter(!isnan, vcat(vec(zalm_data), vec(chahine_data))))
+
+        ax = Axis3(fig[1, i];
+            xlabel = "Mean photon number μ",
+            ylabel = "Source loss ηT",
+            zlabel = m.zlabel,
+            title  = "$(m.name) vs μ and ηT (NI = $(N_I), NM = $(N_M))",
+            azimuth   = 35 * π/180,
+            elevation = 25 * π/180,
+            limits = (nothing, nothing, (0, zmax)),
+            xticks = LinearTicks(10),
+            yticks = LinearTicks(6),
+            zticks = LinearTicks(5),
+        )
+
+        surfaces = [
+            (name = "ZALM",    data = zalm_data,    color = RGBAf(0.18, 0.545, 0.341, 0.8)),
+            (name = "Chahine", data = chahine_data, color = RGBAf(1.0,  0.271, 0.0,   0.8)),
+        ]
+
+        for s in surfaces
+            surface!(ax, μ_vals, ηT_vals, s.data;
+                color = fill(s.color, size(s.data)), shading = NoShading)
+        end
+
+        Legend(fig[2, i],
+            [PolyElement(color = s.color) for s in surfaces],
+            [s.name for s in surfaces];
+            orientation = :horizontal,
+        )
+    end
 
     fig
 end
@@ -632,6 +613,8 @@ try
     display(GLMakie.Screen(), fig1)
     display(GLMakie.Screen(), fig2)
     display(GLMakie.Screen(), fig3)
+    # fig = plot_metrics_comparison_with_3D()
+    # display(fig)
 catch e
     showerror(stdout, e, catch_backtrace())
 end
