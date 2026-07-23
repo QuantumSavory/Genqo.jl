@@ -4,7 +4,7 @@ using Gabs
 using Plots
 
 
-const engine = HybridProjectionEngine(8)
+const engine8 = HybridProjectionEngine(8)
 
 # Alternative ZALM model
 
@@ -15,10 +15,10 @@ function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; parity::Symbol)
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     if parity == :even
         Π_even = projector([:,:,1,0,1,0,:,:]) + projector([:,:,0,1,0,1,:,:])
-        project(st, Π_even; engine, η=η)
+        project(st, Π_even; engine=engine8, η=η)
     elseif parity == :odd
         Π_odd = projector([:,:,1,0,0,1,:,:]) + projector([:,:,0,1,1,0,:,:])
-        project(st, Π_odd; engine, η=η)
+        project(st, Π_odd; engine=engine8, η=η)
     else
         throw(ArgumentError("parity must be :even or :odd"))
     end
@@ -33,7 +33,7 @@ function zalm2(μ::Float64, ηᵗ::Float64, ηᵇ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,1,0,0,:,:])
-    project(st, Π; engine, η=η)
+    project(st, Π; engine=engine8, η=η)
 end
 
 ## Probability of generation

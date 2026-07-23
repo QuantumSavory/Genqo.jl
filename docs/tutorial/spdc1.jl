@@ -4,7 +4,7 @@ using Gabs
 using Plots
 
 
-const engine = HybridProjectionEngine(4)
+const engine4 = HybridProjectionEngine(4)
 
 # SPDC model
 
@@ -14,14 +14,14 @@ function spdc1(μ::Float64, ηᵗ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵗ,ηᵗ]
     Π = projector([:,:,:,:]) # TODO: is there a better way to do this?
-    project(st, Π; engine, η=η)
+    project(st, Π; engine=engine4, η=η)
 end
 
 ## Probability of generation
 function plot_spdc1_probability()
     μ = logrange(1e-4, 10, 100)
     η = 10 .^ -([0, 3, 6, 9]/10)
-    states = spdc1.(μ, η'; engine=engine)
+    states = spdc1.(μ, η')
 
     Pgen = tr.(states)
     Pgen_ground = ones(100)

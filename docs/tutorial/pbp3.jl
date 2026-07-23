@@ -6,7 +6,7 @@ using ProgressBars
 using Plots
 
 
-const engine = HybridProjectionEngine(12)
+const engine12 = HybridProjectionEngine(12)
 
 # 3-source PBP model
 
@@ -20,7 +20,7 @@ function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,0,0,1,1,0,0,1,:,:])
-    project(st, Π; engine, η=η)
+    project(st, Π; engine=engine12, η=η)
 end
 
 ## Probability of generation

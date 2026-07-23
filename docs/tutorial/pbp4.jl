@@ -5,7 +5,7 @@ using ProgressBars
 using Plots
 
 
-const engine = HybridProjectionEngine(16)
+const engine16 = HybridProjectionEngine(16)
 
 # 4-source PBP model
 
@@ -20,7 +20,7 @@ function pbp4(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,0,0,1,1,0,0,1,1,0,0,1,:,:])
-    project(st, Π; engine, η=η)
+    project(st, Π; engine=engine16, η=η)
 end
 
 ## Probability of generation
@@ -42,7 +42,7 @@ end
 
 ## Fidelity
 function plot_pbp4_fidelity()
-    μ = range(1e-4, 1.0, 20)
+    μ = range(1e-4, 1.0, 100)
     η = [1., 0.8, 0.5, 0.25]
     states = pbp4.(μ, 1., η', η')
     ψ⁻ = (clicks([1,0,0,1]) - clicks([0,1,1,0])) / √2
