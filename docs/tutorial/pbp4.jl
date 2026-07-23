@@ -1,11 +1,8 @@
 using Genqo
 using Gabs
 
-using ProgressBars
 using Plots
 
-
-const engine16 = HybridProjectionEngine(16)
 
 # 4-source PBP model
 
@@ -20,7 +17,7 @@ function pbp4(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,0,0,1,1,0,0,1,1,0,0,1,:,:])
-    project(st, Π; engine=engine16, η=η)
+    project(st, Π; η=η)
 end
 
 ## Probability of generation
@@ -28,10 +25,7 @@ function plot_pbp4_probability()
     μ = range(1e-3, 1, 100)
     η = [1., 0.8, 0.5, 0.25]
     states = pbp4.(μ, 1., η', η')
-    Pgen = similar(states, Float64)
-    Threads.@threads for I in ProgressBar(CartesianIndices(states))
-        Pgen[I] = tr(states[I])
-    end
+    Pgen = tr.(states)
 
     plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=1)
     plot!(μ, Pgen[:,2], label="\\eta = 0.8", color=2)
@@ -46,10 +40,7 @@ function plot_pbp4_fidelity()
     η = [1., 0.8, 0.5, 0.25]
     states = pbp4.(μ, 1., η', η')
     ψ⁻ = (clicks([1,0,0,1]) - clicks([0,1,1,0])) / √2
-    F = similar(states, Float64)
-    Threads.@threads for I in ProgressBar(CartesianIndices(states))
-        F[I] = real(dot(ψ⁻', states[I], ψ⁻)) / tr(states[I])
-    end
+    F = @. dot([ψ⁻'], states, [ψ⁻]) / tr(states) |> real
 
     plot(μ, F[:,1], label="\\eta = 1.0", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright, color=1)
     plot!(μ, F[:,2], label="\\eta = 0.8")

@@ -5,8 +5,6 @@ using QuantumOpticsBase
 using Plots
 
 
-const engine8 = HybridProjectionEngine(8)
-
 # ZALM model
 
 function zalm2(μ::Float64, ηR::Float64, ηT::Float64)
@@ -16,7 +14,7 @@ function zalm2(μ::Float64, ηR::Float64, ηT::Float64)
 
     η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
     Π = projector([:,:,1,1,0,0,:,:])
-    project(st, Π; engine=engine8, η=η)
+    project(st, Π; η=η)
 end
 
 ## Probability of generation
@@ -48,10 +46,10 @@ function plot_zalm2_Bell_state_fraction()
         Π_A0 = projector([0,0,1,1,0,0,:,:])
         Π_B0 = projector([:,:,1,1,0,0,0,0])
         Π_S0 = projector([0,0,1,1,0,0,0,0])
-        st_S = project(st, Π_S; engine=engine8, η=η)
-        st_A0 = project(st, Π_A0; engine=engine8, η=η)
-        st_B0 = project(st, Π_B0; engine=engine8, η=η)
-        st_S0 = project(st, Π_S0; engine=engine8, η=η)
+        st_S = project(st, Π_S; η=η)
+        st_A0 = project(st, Π_A0; η=η)
+        st_B0 = project(st, Π_B0; η=η)
+        st_S0 = project(st, Π_S0; η=η)
 
         tr(st_S) - tr(st_A0) - tr(st_B0) + tr(st_S0)
     end
@@ -63,7 +61,7 @@ function plot_zalm2_Bell_state_fraction()
 
         η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
         Π = projector([:,:,1,1,0,0,:,:])
-        st = project(st, Π; engine=engine8, η=η)
+        st = project(st, Π; η=η)
 
         ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
         ψ⁻ = (clicks([1,0,0,1]) - clicks([0,1,1,0])) / √2

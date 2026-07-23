@@ -2,11 +2,8 @@ using Genqo
 using Gabs
 using QuantumOpticsBase
 
-using ProgressBars
 using Plots
 
-
-const engine12 = HybridProjectionEngine(12)
 
 # 3-source PBP model
 
@@ -20,7 +17,7 @@ function pbp3(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,0,0,1,1,0,0,1,:,:])
-    project(st, Π; engine=engine12, η=η)
+    project(st, Π; η=η)
 end
 
 ## Probability of generation
@@ -45,10 +42,7 @@ function plot_pbp3_fidelity()
     η = [1., 0.8, 0.5, 0.25]
     states = pbp3.(μ, 1., η', η')
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
-    F = similar(states, Float64)
-    Threads.@threads for I in ProgressBar(CartesianIndices(states))
-        F[I] = real(dot(ψ⁺', states[I], ψ⁺)) / tr(states[I])
-    end
+    F = @. real(dot([ψ⁺'], states, [ψ⁺])) / tr(states)
 
     plot(μ, F[:,1], label="\\eta = 1.0", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright, color=1)
     plot!(μ, F[:,2], label="\\eta = 0.8")
@@ -63,13 +57,9 @@ function plot_pbp3_distillable_entanglement_rate()
     ηR = 0.01
     ηT = 1.0:-0.1:0.6
     states = pbp3.(μ, ηR, ηT', ηT')
-    ρAB = similar(states, Operator)
-    Pgen = similar(states, Float64)
-    Threads.@threads for I in ProgressBar(CartesianIndices(states))
-        ρAB[I] = duankimble(states[I], [1,0,1,0]) * 4
-        Pgen[I] = tr(ρAB[I])
-        ρAB[I] /= Pgen[I]
-    end
+    ρAB = duankimble.(states, [[1,0,1,0]]) .* 4
+    Pgen = tr.(ρAB) .|> real
+    ρAB ./= Pgen
 
     # Compute Hashing bound
     SρAB = @. entropy_vn(ρAB) |> real

@@ -10,7 +10,7 @@ export
     # Types
     AbstractClickState, ClickStateKet, ClickStateBra, AbstractClickOperator, ClickProjector, AbstractProjectionEngine, HybridProjectionEngine, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
     # Functions
-    clicks, projector, norm, project, tr, dot, fidelity, to_fock, duankimble
+    clicks, projector, norm, get_default_engine, project, tr, dot, fidelity, to_fock, duankimble
 
 
 # TODO: inherit from something in QuantumOptics.jl and make this a full-fledged state
@@ -131,6 +131,12 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
         )
     end
 end
+const _default_engines = Dict{Int, HybridProjectionEngine}()
+function get_default_engine(mds::Int)
+    get!(_default_engines, mds) do
+        HybridProjectionEngine(mds)
+    end
+end
 
 abstract type AbstractProjectedState end
 abstract type AbstractProjectedPureGaussianState end
@@ -150,7 +156,7 @@ struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
     end
 end
 freemodes(projected_state::ProjectedPureGaussianState) = freemodes(projected_state.proj)
-project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine, η::Vector{Float64}=ones(engine.mds)) = ProjectedPureGaussianState(st, proj, engine, η)
+project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine=get_default_engine(nmodes(st)), η::Vector{Float64}=ones(nmodes(st))) = ProjectedPureGaussianState(st, proj, engine, η)
 
 """
     tr(projected_state::ProjectedPureGaussianState)
@@ -173,7 +179,7 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     Tr = zero(ComplexF64)
     for n in eachrow(proj.clicks)
         nf = max.(n, 0) # Filter out -1 (traceout) modes
-        A, denom = A_matrix(σ, η, n; traceout=true)
+        A, denom = _A_matrix(σ, η, n; traceout=true)
         invA = inv(A)
 
         ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
@@ -204,7 +210,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
 
     Dot = zero(ComplexF64)
     for n in eachrow(proj.clicks)
-        A, denom = A_matrix(σ, η, n; traceout=false)
+        A, denom = _A_matrix(σ, η, n; traceout=false)
         invA = inv(A)
 
         C = zero(WTerms{Tuple{}}) # Start with empty WTerms
@@ -270,7 +276,7 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
 
     ρ = Operator(reduce(⊗, SpinBasis(1//2) for _ in 1:n_mem), zeros(ComplexF64, M, M))
     for n in eachrow(proj.clicks)
-        A, denom = A_matrix(σ, η, n; traceout=false)
+        A, denom = _A_matrix(σ, η, n; traceout=false)
         invA = inv(A)
 
         for i in 1:mds
@@ -314,7 +320,7 @@ function _pair(modes::Vector{Int})
 end
 
 
-function A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::SubArray{Int}; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Float64}
+function _A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::SubArray{Int}; traceout::Bool=false)::Tuple{Matrix{ComplexF64}, Float64}
     size(σ, 1) == size(σ, 2) || throw(ArgumentError("Covariance matrix must be square"))
     mds = size(σ, 1) ÷ 2
     length(n) == length(η) == mds || throw(ArgumentError("Length of n and η must match number of modes in covariance matrix"))
