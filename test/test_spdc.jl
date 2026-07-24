@@ -17,8 +17,8 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         # Bell-state overlap of the raw (unheralded) source: all four modes kept.
-        ps = project(st, projector([-1, -1, -1, -1]); engine, η = fill(ηᵗ * ηᵈ, 4))
-        @test real(dot(ψ⁺', ps, ψ⁺)) ≈ GT["spdc/fidelity"][i] rtol = 1e-9
+        ps = project(st, projector([-1, -1, -1, -1]); η = fill(ηᵗ * ηᵈ, 4))
+        @test real(dot(ψ⁺', ps, ψ⁺; engine)) ≈ GT["spdc/fidelity"][i] rtol = 1e-9
     end
 end
 
@@ -35,7 +35,7 @@ end
 
         st = eprstate(QuadBlockBasis(4), asinh(√μ), Float64(π))
         apply!(st, modeswap(QuadBlockBasis(2)), [2, 4])
-        ps = project(st, projector([-1, -1, -1, -1]); engine, η = fill(ηᵗ * ηᵈ, 4))
+        ps = project(st, projector([-1, -1, -1, -1]); η = fill(ηᵗ * ηᵈ, 4))
 
         # Duan-Kimble loading of the raw source into two memories, pairing modes
         # (1,2) and (3,4), reproduces the legacy spin-spin density matrix
@@ -43,6 +43,6 @@ end
         @test size(ρ.data) == (4, 4)
         @test ρ.data ≈ GT["spdc/sdm"][:, :, i] rtol = 1e-9
         # The default consecutive pairing of the traced-out modes is explicit here
-        @test duankimble(ps, nvec, [(1, 2), (3, 4)]).data ≈ ρ.data
+        @test duankimble(ps, nvec, [(1, 2), (3, 4)]; engine).data ≈ ρ.data
     end
 end

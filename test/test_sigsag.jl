@@ -26,13 +26,13 @@
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         η = sigsag_η(ηᵗ, ηᵈ)
-        ps = project(st, Π; engine, η = η)
-        @test tr(ps) ≈ GT["sigsag/pgen"][i] rtol = 1e-9
-        @test real(fidelity(ψ⁺, ps)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
+        ps = project(st, Π; η = η)
+        @test tr(ps; engine) ≈ GT["sigsag/pgen"][i] rtol = 1e-9
+        @test real(fidelity(ψ⁺, ps; engine)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
 
         # Same results from the legacy covariance wrapped directly
-        ps_legacy = project(GroundTruth.legacy_state(cov), Π; engine, η = η)
+        ps_legacy = project(GroundTruth.legacy_state(cov), Π; η = η)
         @test tr(ps_legacy) ≈ GT["sigsag/pgen"][i] rtol = 1e-9
-        @test real(fidelity(ψ⁺, ps_legacy)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
+        @test real(fidelity(ψ⁺, ps_legacy; engine)) ≈ GT["sigsag/fidelity"][i] rtol = 1e-9
     end
 end

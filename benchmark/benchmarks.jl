@@ -51,16 +51,17 @@ const ENGINE8 = HybridProjectionEngine(8)
 const ψ⁺ = (clicks([1, 0, 0, 1]) + clicks([0, 1, 1, 0])) / √2
 const ψ⁺ᵈ = ψ⁺'
 
-let ps = project(zalm_state(μ), ZALM_Π; engine = ENGINE8, η = ZALM_η) # warm the C-polynomial cache
-    tr(ps)
-    dot(ψ⁺ᵈ, ps, ψ⁺)
+let ps = project(zalm_state(μ), ZALM_Π; η = ZALM_η) # warm the C-polynomial cache
+    tr(ps; engine = ENGINE8)
+    dot(ψ⁺ᵈ, ps, ψ⁺; engine = ENGINE8)
 end
 
 SUITE["project.zalm_state"] = @benchmarkable zalm_state($μ)
-SUITE["project.tr"] = @benchmarkable tr(ps) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
-SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
-SUITE["project.to_fock"] = @benchmarkable to_fock(ps; cutoff = 1) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
-SUITE["project.duankimble"] = @benchmarkable duankimble(ps, $[1, 0, 1, 0]) setup = (ps = project(zalm_state($μ), ZALM_Π; engine = ENGINE8, η = ZALM_η))
+SUITE["project.tr"] = @benchmarkable tr(ps; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.to_fock"] = @benchmarkable to_fock(ps; engine = ENGINE8, cutoff = 1) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.duankimble"] = @benchmarkable duankimble(ps, $[1, 0, 1, 0]; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+
 
 
 # v1 legacy sources: one headline calculation per source

@@ -24,8 +24,8 @@ const engine8 = HybridProjectionEngine(8)
 function spdc_duankimble(mu, eta_t, eta_d, nvec)
     st = eprstate(QuadBlockBasis(4), asinh(sqrt(mu)), Float64(pi))
     apply!(st, modeswap(QuadBlockBasis(2)), [2, 4])
-    ps = project(st, projector([-1, -1, -1, -1]); engine = engine4, η = fill(eta_t * eta_d, 4))
-    duankimble(ps, collect(Int, nvec)).data
+    ps = project(st, projector([-1, -1, -1, -1]); η = fill(eta_t * eta_d, 4))
+    duankimble(ps, collect(Int, nvec); engine = engine4).data
 end
 
 function zalm_duankimble(mu, eta_t, eta_d, eta_b, nvec)
@@ -37,8 +37,8 @@ function zalm_duankimble(mu, eta_t, eta_d, eta_b, nvec)
     apply!(st, bs, [3, 5])
     apply!(st, bs, [4, 6])
     η = [eta_t*eta_d, eta_t*eta_d, eta_b, eta_b, eta_b, eta_b, eta_t*eta_d, eta_t*eta_d]
-    ps = project(st, projector([-1, -1, 1, 1, 0, 0, -1, -1]); engine = engine8, η = η)
-    duankimble(ps, collect(Int, nvec)[[1, 2, 7, 8]]).data .* 4
+    ps = project(st, projector([-1, -1, 1, 1, 0, 0, -1, -1]); η = η)
+    duankimble(ps, collect(Int, nvec)[[1, 2, 7, 8]]; engine = engine8).data .* 4
 end
 
 end

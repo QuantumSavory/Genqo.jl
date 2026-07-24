@@ -144,28 +144,29 @@ abstract type AbstractProjectedPureGaussianState end
 struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
     st::GaussianState
     proj::ClickProjector
-    engine::HybridProjectionEngine
     η::Vector{Float64}
-    function ProjectedPureGaussianState(st::GaussianState, proj::ClickProjector, engine::HybridProjectionEngine, η::Vector{Float64})
-        engine.mds == nmodes(st) == nmodes(proj) == length(η) || throw(ArgumentError("Engine, state, projector, and loss vector must have the same number of modes"))
+    function ProjectedPureGaussianState(st::GaussianState, proj::ClickProjector, η::Vector{Float64})
+        nmodes(st) == nmodes(proj) == length(η) || throw(ArgumentError("State, projector, and loss vector must have the same number of modes"))
         all(η .≥ 0) && all(η .≤ 1) || throw(ArgumentError("Loss vector must be between 0 and 1"))
         all(iszero.(st.mean)) || throw(ArgumentError("Input Gaussian state must have zero displacement"))
         purity(st) ≈ 1. || throw(ArgumentError("Input Gaussian state must be pure"))
         all(proj.clicks .== 0 .|| proj.clicks .== 1 .|| proj.clicks .== -1) || throw(ArgumentError("Detector outcomes must be 0, 1, or -1")) # TODO: support multi-photon number outcomes
-        new(st, proj, engine, η)
+        new(st, proj, η)
     end
 end
+nmodes(projected_state::ProjectedPureGaussianState) = nmodes(projected_state.st)
 freemodes(projected_state::ProjectedPureGaussianState) = freemodes(projected_state.proj)
-project(st::GaussianState, proj::ClickProjector; engine::HybridProjectionEngine=get_default_engine(nmodes(st)), η::Vector{Float64}=ones(nmodes(st))) = ProjectedPureGaussianState(st, proj, engine, η)
+project(st::GaussianState, proj::ClickProjector; η::Vector{Float64}=ones(nmodes(st))) = ProjectedPureGaussianState(st, proj, η)
 
 """
     tr(projected_state::ProjectedPureGaussianState)
 
 Computes the probability of success for a given projected pure Gaussian state.
 """
-function tr(projected_state::ProjectedPureGaussianState)::Float64
+function tr(projected_state::ProjectedPureGaussianState; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)))::Float64
+    nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
+
     st = projected_state.st
-    engine = projected_state.engine
     α = engine.α
     β = engine.β
     proj = projected_state.proj
@@ -196,10 +197,11 @@ function tr(projected_state::ProjectedPureGaussianState)::Float64
     real(Tr)
 end
 
-function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet)::ComplexF64 # TODO: is this the right return type?
+function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)))::ComplexF64 # TODO: is this the right return type?
+    nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
+
     st = projected_state.st
     η = projected_state.η
-    engine = projected_state.engine
     α = engine.α
     β = engine.β
     proj = projected_state.proj
@@ -229,16 +231,16 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     end
     Dot
 end
-fidelity(target::ClickStateKet, projected_state::ProjectedPureGaussianState) = dot(target', projected_state, target) / tr(projected_state)
-fidelity(target::ClickStateBra, projected_state::ProjectedPureGaussianState) = dot(target, projected_state, target') / tr(projected_state)
+fidelity(target::ClickStateKet, projected_state::ProjectedPureGaussianState; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state))) = dot(target', projected_state, target; engine) / tr(projected_state; engine)
+fidelity(target::ClickStateBra, projected_state::ProjectedPureGaussianState; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state))) = dot(target, projected_state, target'; engine) / tr(projected_state; engine)
 
 """
 Computes the unnormalized Fock-basis photon-photon density matrix of a projected pure Gaussian state
 """
-function to_fock(projected_state::ProjectedPureGaussianState; cutoff::Int=2)::Operator
+function to_fock(projected_state::ProjectedPureGaussianState; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)), cutoff::Int=2)::Operator
     proj = projected_state.proj
     m = count(proj.clicks[1,:] .== -1) # Number of modes to include in the resulting density matrix (traceout placement is consistent across terms)
-    basis = reduce(⊗, FockBasis(cutoff) for _ in 1:m) # (cutoff+1)^m-dimensional Hilbert space for the density matrix
+    basis = reduce(⊗, fill(FockBasis(cutoff), m)) # (cutoff+1)^m-dimensional Hilbert space for the density matrix
 
     sz = length(basis)
     dm = Operator(basis, Matrix{ComplexF64}(undef, sz, sz))
@@ -247,7 +249,7 @@ function to_fock(projected_state::ProjectedPureGaussianState; cutoff::Int=2)::Op
     inds = Iterators.product(repeat([0:cutoff], m)...)
     for (i, bcl) in enumerate(inds), (j, kcl) in enumerate(inds)
         bra = clicks(collect(bcl))'; ket = clicks(collect(kcl))
-        dm.data[i, j] = dot(bra, projected_state, ket)
+        dm.data[i, j] = dot(bra, projected_state, ket; engine=engine)
     end
 
     dm
@@ -256,9 +258,10 @@ end
 """
 Models Duan-Kimble loading into a spin quantum memory
 """
-function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int}, modes::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)))::Operator
+function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int}, modes::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)); engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)))::Operator
+    nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
+
     st = projected_state.st
-    engine = projected_state.engine
     α = engine.α
     β = engine.β
     proj = projected_state.proj
@@ -274,7 +277,7 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
     gstate = changebasis(QuadBlockBasis, st)
     σ = gstate.covar ./ gstate.ħ
 
-    ρ = Operator(reduce(⊗, SpinBasis(1//2) for _ in 1:n_mem), zeros(ComplexF64, M, M))
+    ρ = Operator(reduce(⊗, fill(SpinBasis(1//2), n_mem)), zeros(ComplexF64, M, M))
     for n in eachrow(proj.clicks)
         A, denom = _A_matrix(σ, η, n; traceout=false)
         invA = inv(A)

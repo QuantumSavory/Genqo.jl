@@ -16,9 +16,9 @@
 
         # Coincidence probability: both photons detected with efficiency ηᵈ
         Π, η = projector([1, 1]), [ηᵈ, ηᵈ]
-        @test tr(project(st, Π; engine, η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
+        @test tr(project(st, Π; η = η); engine) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
         # Same result from the legacy covariance wrapped directly
         st_legacy = GroundTruth.legacy_state(cov)
-        @test tr(project(st_legacy, Π; engine, η = η)) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
+        @test tr(project(st_legacy, Π; η = η); engine) ≈ GT["tmsv/pgen"][i] rtol = 1e-9
     end
 end
