@@ -348,9 +348,9 @@ function _A_matrix(σ::Matrix{Float64}, η::Vector{Float64}, n::SubArray{Int}; t
     
     for (i, ni) in enumerate(n)
         # Expansion of αβ*(1 - η), or αβ* for A_pgen transmitted modes: blocks (1,2) and (2,1)
-        l = traceout && ni == -1 ? -one(ComplexF64) : ComplexF64(η[i] - 1.)
-        A[i,     i+mds] = l
-        A[i+mds, i    ] = l
+        y = traceout && ni == -1 ? -one(ComplexF64) : ComplexF64(η[i] - 1.)
+        A[i,     i+mds] = y
+        A[i+mds, i    ] = y
 
         # Identity: blocks (1,3) (2,4) (3,1) and (4,2)
         A[i,      i+2mds] = one(ComplexF64)
