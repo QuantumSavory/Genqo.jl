@@ -8,7 +8,7 @@ using Plots
 
 function spdc1(μ::Float64, ηᵗ::Float64)
     st = eprstate(QuadBlockBasis(4), asinh(√μ), 0.)
-    apply!(st, modeswap(QuadBlockBasis(2)), [2,4])
+    apply!(st, [2,4], modeswap(QuadBlockBasis(2)))
 
     η = [ηᵗ,ηᵗ,ηᵗ,ηᵗ]
     Π = projector([:,:,:,:]) # TODO: is there a better way to do this?

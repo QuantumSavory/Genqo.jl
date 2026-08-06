@@ -20,10 +20,10 @@
         st = eprstate(QuadBlockBasis(8), asinh(√μ), Float64(π))
         ms = modeswap(QuadBlockBasis(2))
         bs = beamsplitter(QuadBlockBasis(2), 0.5)
-        apply!(st, ms, [2, 4])
-        apply!(st, ms, [5, 7])
-        apply!(st, bs, [3, 5])
-        apply!(st, bs, [4, 6])
+        apply!(st, [2, 4], ms)
+        apply!(st, [5, 7], ms)
+        apply!(st, [3, 5], bs)
+        apply!(st, [4, 6], bs)
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         η = zalm_η(ηᵗ, ηᵈ, ηᵇ)

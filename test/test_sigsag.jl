@@ -18,11 +18,11 @@
         # Circuit construction: one SPDC source plus two vacuum modes, interfered on
         # beamsplitters between modes (3,5) and (4,6)
         st4 = eprstate(QuadBlockBasis(4), asinh(√μ), Float64(π))
-        apply!(st4, modeswap(QuadBlockBasis(2)), [2, 4])
+        apply!(st4, [2, 4], modeswap(QuadBlockBasis(2)))
         st = st4 ⊗ vacuumstate(QuadBlockBasis(2))
         bs = beamsplitter(QuadBlockBasis(2), 0.5)
-        apply!(st, bs, [3, 5])
-        apply!(st, bs, [4, 6])
+        apply!(st, [3, 5], bs)
+        apply!(st, [4, 6], bs)
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         η = sigsag_η(ηᵗ, ηᵈ)

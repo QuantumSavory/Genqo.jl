@@ -9,7 +9,7 @@ using Plots
 
 function alt_zalm(μ::Float64, ηᵗ::Float64, ηᵇ::Float64; parity::Symbol)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
-    apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
+    apply!(st, [2,4, 5,7], modeswap(QuadBlockBasis(4)))
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     if parity == :even
@@ -27,8 +27,8 @@ end
 
 function zalm2(μ::Float64, ηᵗ::Float64, ηᵇ::Float64)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
-    apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
-    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+    apply!(st, [2,4, 5,7], modeswap(QuadBlockBasis(4)))
+    apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,1,0,0,:,:])

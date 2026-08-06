@@ -8,12 +8,12 @@ using Plots
 
 function pbp4(μ::Float64, ηᵗ::Float64, ηᵇ::Float64, ηᵍ::Float64)
     sagnac = eprstate(QuadBlockBasis(4), asinh(√μ), 0.)
-    apply!(sagnac, modeswap(QuadBlockBasis(2)), [1,3])
+    apply!(sagnac, [1,3], modeswap(QuadBlockBasis(2)))
     st = sagnac ⊗ sagnac ⊗ sagnac ⊗ sagnac
 
-    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
-    apply!(st, greenmachine(QuadBlockBasis(4), 4), [7,8, 9,10])
-    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [11,13, 12,14])
+    apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
+    apply!(st, [7,8, 9,10], greenmachine(QuadBlockBasis(4), 4))
+    apply!(st, [11,13, 12,14], beamsplitter(QuadBlockBasis(4), 0.5))
 
     η = [ηᵗ,ηᵗ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵍ,ηᵍ,ηᵍ,ηᵍ,ηᵇ,ηᵇ,ηᵇ,ηᵇ,ηᵗ,ηᵗ]
     Π = projector([:,:,1,0,0,1,1,0,0,1,1,0,0,1,:,:])

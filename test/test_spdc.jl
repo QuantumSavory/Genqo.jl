@@ -13,7 +13,7 @@
         # Circuit construction: two EPR pairs (1,2)(3,4), then swapping modes 2 and 4
         # yields the SPDC polarization pairing (1,4)(2,3)
         st = eprstate(QuadBlockBasis(4), asinh(√μ), Float64(π))
-        apply!(st, modeswap(QuadBlockBasis(2)), [2, 4])
+        apply!(st, [2, 4], modeswap(QuadBlockBasis(2)))
         @test st.covar ≈ 2 .* cov rtol = 1e-12
 
         # Bell-state overlap of the raw (unheralded) source: all four modes kept.
@@ -34,7 +34,7 @@ end
         μ, ηᵗ, ηᵈ, ηᵇ = P[i, :]
 
         st = eprstate(QuadBlockBasis(4), asinh(√μ), Float64(π))
-        apply!(st, modeswap(QuadBlockBasis(2)), [2, 4])
+        apply!(st, [2, 4], modeswap(QuadBlockBasis(2)))
         ps = project(st, projector([-1, -1, -1, -1]); η = fill(ηᵗ * ηᵈ, 4))
 
         # Duan-Kimble loading of the raw source into two memories, pairing modes

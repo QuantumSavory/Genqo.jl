@@ -9,8 +9,8 @@ using Plots
 
 function zalm2(μ::Float64, ηR::Float64, ηT::Float64)
     st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
-    apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
-    apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+    apply!(st, [2,4, 5,7], modeswap(QuadBlockBasis(4)))
+    apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
 
     η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
     Π = projector([:,:,1,1,0,0,:,:])
@@ -38,8 +38,8 @@ function plot_zalm2_Bell_state_fraction()
 
     function zalm2_Pload(μ::Float64, ηR::Float64, ηT::Float64)
         st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
-        apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
-        apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+        apply!(st, [2,4, 5,7], modeswap(QuadBlockBasis(4)))
+        apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
 
         η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
         Π_S = projector([:,:,1,1,0,0,:,:])
@@ -56,8 +56,8 @@ function plot_zalm2_Bell_state_fraction()
 
     function zalm2_PBell(μ::Float64, ηR::Float64, ηT::Float64)
         st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
-        apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
-        apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+        apply!(st, [2,4, 5,7], modeswap(QuadBlockBasis(4)))
+        apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
 
         η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
         Π = projector([:,:,1,1,0,0,:,:])
