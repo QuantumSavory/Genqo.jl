@@ -77,11 +77,17 @@ each `_W_bucket` call specializes on its bucket's degree.
 """
 struct WTerms{B<:Tuple}
     buckets::B
+    mds::Int
 end
-Base.zero(::Type{WTerms{B}}) where {B<:Tuple} = WTerms(B())
-Base.:+(a::WTerms, b::WTerms) = WTerms((a.buckets..., b.buckets...)) # concatenate buckets
-Base.:*(a::C, b::WTerms) where {C<:Number} = WTerms(b.buckets .* a)
-Base.:*(a::WTerms, b::C) where {C<:Number} = WTerms(a.buckets .* b)
+Base.zero(::Type{WTerms{B}}) where {B<:Tuple} = WTerms(B(), 0)
+function Base.:+(a::WTerms, b::WTerms)
+    a.mds == 0 && return b
+    b.mds == 0 && return a
+    a.mds == b.mds || throw(DimensionMismatch("Cannot add WTerms with different mode counts: $(a.mds) and $(b.mds)"))
+    WTerms((a.buckets..., b.buckets...), a.mds) # concatenate buckets
+end
+Base.:*(a::C, b::WTerms) where {C<:Number} = WTerms(b.buckets .* a, b.mds)
+Base.:*(a::WTerms, b::C) where {C<:Number} = WTerms(a.buckets .* b, a.mds)
 
 """
     extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
@@ -99,6 +105,7 @@ A `WTerms{<:Tuple}` whose buckets cover every degree present in `C`.
 """
 function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
     n_vars = nvars(parent(C))
+    iseven(n_vars) || throw(ArgumentError("Polynomial ring must have an even number of variables (α and β for every mode)"))
 
     by_deg = Dict{Int, Tuple{Vector{ComplexF64}, Vector{Vector{Int}}}}()
     for (mon, coeff) in zip(monomials(C), coefficients(C))
@@ -119,7 +126,7 @@ function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
     # Sort by descending bucket size so the dominant bucket runs first.
     degs_sorted = sort!(collect(keys(by_deg)); by = N -> -length(by_deg[N][1]))
     buckets = ((_make_bucket(N, by_deg[N]...) for N in degs_sorted)...,)
-    return WTerms(buckets)
+    return WTerms(buckets, n_vars÷2)
 end
 
 # Build a concrete `WBucket{N}` with N as a value-type-dispatched constant. Calling `WBucket{N}(...)`
@@ -140,7 +147,10 @@ Fast Wick evaluator for precompiled moment terms.
 # Returns
 Complex value of the contracted moment.
 """
-W(t::WTerms, Ainv::Matrix{ComplexF64}) = _sum_buckets(t.buckets, Ainv)
+function W(t::WTerms, Ainv::Matrix{ComplexF64})
+    2*t.mds == size(Ainv, 1) == size(Ainv, 2) || throw(DimensionMismatch("Ainv must be a square matrix of size $(2*t.mds)×$(2*t.mds) to contract against a $(t.mds)-mode polynomial, got $(size(Ainv, 1))×$(size(Ainv, 2))"))
+    _sum_buckets(t.buckets, Ainv)
+end
 
 # Recursive helper so a heterogeneous Tuple iterates type-stably (a plain `for` would infer the
 # element type as the abstract join of the bucket types and dynamic-dispatch each call).
@@ -212,7 +222,6 @@ monomials have no perfect pairing and contract to zero, matching `wick_out`.
     end
 end
 
-# TODO: Implement some up-front bounds safety check so that the inner loop can be fully @inbounds.
 @inline function _W_bucket(b::WBucket{N}, Ainv::Matrix{ComplexF64})::ComplexF64 where {N}
     s = zero(ComplexF64)
     @inbounds for x in eachindex(b.coeffs)
@@ -235,7 +244,8 @@ Gaussian moment implied by `C` and `Ainv`.
 """
 function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64})::ComplexF64
     n_vars = nvars(parent(C))
-    n_vars ≤ size(Ainv, 1) || throw(ArgumentError("C has $n_vars variables but Ainv is only $(size(Ainv, 1))×$(size(Ainv, 2))"))
+    iseven(n_vars) || throw(ArgumentError("Polynomial ring must have an even number of variables (α and β for every mode)"))
+    n_vars == size(Ainv, 1) == size(Ainv, 2) || throw(DimensionMismatch("Ainv must be a square matrix of size $n_vars×$n_vars to contract against a $(n_vars÷2)-mode polynomial, got $(size(Ainv, 1))×$(size(Ainv, 2))"))
     elm = zero(ComplexF64)
     for (mon, coeff) in zip(monomials(C), coefficients(C))
         elm += coeff * wick_out([i for i in 1:n_vars if exponent(mon, 1, i) == 1], Ainv)

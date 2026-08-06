@@ -38,7 +38,7 @@ end
     α, β = engine.α, engine.β
     CC = Nemo.ComplexField()
 
-    B = rand(StableRNG(2), ComplexF64, 24, 24)
+    B = rand(StableRNG(2), ComplexF64, 12, 12)
     Ainv = B + transpose(B)
 
     # Mixed-degree multilinear polynomial: degrees 4 and 8, complex coefficients
@@ -53,6 +53,10 @@ end
 
     # Odd-degree monomials contract to zero
     @test W(extract_W_terms(α[1] * α[2] * β[1]), Ainv) ≈ 0 atol = 1e-14
+
+    # W throws error when the size of Ainv is inconsistent with the number of variables in the polynomial ring WTerms came from
+    @test_throws DimensionMismatch W(α[1] * α[2] * β[1] * β[2], Ainv[1:10, 1:10])
+    @test_throws DimensionMismatch W(extract_W_terms(α[1] * α[2] * β[1] * β[2]), Ainv[1:10, 1:10])
 end
 
 @testitem "WTerms algebra" begin
@@ -60,7 +64,7 @@ end
 
     engine = HybridProjectionEngine(2)
     α, β = engine.α, engine.β
-    B = rand(StableRNG(3), ComplexF64, 8, 8)
+    B = rand(StableRNG(3), ComplexF64, 4, 4)
     Ainv = B + transpose(B)
 
     t = extract_W_terms(α[1] * α[2] * β[1] * β[2])
@@ -72,7 +76,7 @@ end
 
     # The accumulate-from-zero pattern used by dot(::ClickStateBra, ...)
     acc = zero(WTerms{Tuple{}})
-    @test W(acc, Ainv) == 0
+    @test W(acc, Matrix{ComplexF64}(undef, 0, 0)) == 0
     acc += (1.0 + 0.0im) * t
     acc += (0.0 + 1.0im) * t
     @test W(acc, Ainv) ≈ (1 + im) * w
