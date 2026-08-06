@@ -363,22 +363,22 @@ function _invA_UL(σ::Matrix{Float64}, η::Vector{Float64}, n::SubArray{Int}; tr
         if e isa LinearAlgebra.SingularException
             @warn "Block inversion of A failed due to singularity of C̃; falling back to full inversion of A"
             # Fallback to using the full inverse of A if the block inversion fails due to singularity of C̃
-    # Compute A matrix from blocks (block ordering: [α β* α* β])
-    A = zeros(ComplexF64, 4mds, 4mds)
+            # Compute A matrix from blocks (block ordering: [α β* α* β])
+            A = zeros(ComplexF64, 4mds, 4mds)
             @views @. A[2mds+1:3mds, 2mds+1:3mds] = C̃
             @views @. A[3mds+1:4mds, 3mds+1:4mds] = conj(C̃)
-    
-    for (i, ni) in enumerate(n)
-        # Expansion of αβ*(1 - η), or αβ* for A_pgen transmitted modes: blocks (1,2) and (2,1)
-        y = traceout && ni == -1 ? -one(ComplexF64) : ComplexF64(η[i] - 1.)
-        A[i,     i+mds] = y
-        A[i+mds, i    ] = y
+            
+            for (i, ni) in enumerate(n)
+                # Expansion of αβ*(1 - η), or αβ* for A_pgen transmitted modes: blocks (1,2) and (2,1)
+                y = traceout && ni == -1 ? -one(ComplexF64) : ComplexF64(η[i] - 1.)
+                A[i,     i+mds] = y
+                A[i+mds, i    ] = y
 
-        # Identity: blocks (1,3) (2,4) (3,1) and (4,2)
-        A[i,      i+2mds] = one(ComplexF64)
-        A[i+mds,  i+3mds] = one(ComplexF64)
-        A[i+2mds, i     ] = one(ComplexF64)
-        A[i+3mds, i+mds ] = one(ComplexF64)
+                # Identity: blocks (1,3) (2,4) (3,1) and (4,2)
+                A[i,      i+2mds] = one(ComplexF64)
+                A[i+mds,  i+3mds] = one(ComplexF64)
+                A[i+2mds, i     ] = one(ComplexF64)
+                A[i+3mds, i+mds ] = one(ComplexF64)
             end
 
             invA_UL = inv(A)[1:2mds, 1:2mds] # Extract upper-left block of A⁻¹
