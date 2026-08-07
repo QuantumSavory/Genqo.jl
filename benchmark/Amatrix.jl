@@ -70,8 +70,8 @@ for N in (8, 12, 16)
     @assert cond(C̃_of(σ_fast)) < 1e8 "expected a well-conditioned C̃ for the shortcut-path input"
     @assert !isfinite(cond(C̃_of(σ_slow))) || cond(C̃_of(σ_slow)) > 1e12 "expected a singular C̃ for the fallback-path input"
 
-    b_fast = @benchmark Genqo._invA_UL($σ_fast, $η, $n; traceout = false) seconds = 1
-    b_slow = @benchmark Genqo._invA_UL($σ_slow, $η, $n; traceout = false) seconds = 1
+    b_fast = @benchmark Genqo._invA_UL($σ_fast, $η, $n) seconds = 1
+    b_slow = @benchmark Genqo._invA_UL($σ_slow, $η, $n) seconds = 1
 
     t_fast, t_slow = median(b_fast).time, median(b_slow).time
     m_fast, m_slow = median(b_fast).memory, median(b_slow).memory
