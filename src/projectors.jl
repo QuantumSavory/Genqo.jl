@@ -95,6 +95,7 @@ Base.:(==)(a::ClickProjector, b::ClickProjector) = a.clicks == b.clicks
 Base.:+(a::ClickProjector, b::ClickProjector) = ClickProjector(vcat(a.clicks, b.clicks))
 nmodes(cp::ClickProjector) = size(cp.clicks, 2)
 freemodes(cp::ClickProjector) = findall(==(-1), cp.clicks[1,:])
+nfreemodes(cp::ClickProjector) = count(==(-1), cp.clicks[1,:])
 
 
 abstract type AbstractProjectionEngine end
@@ -156,6 +157,7 @@ struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
 end
 nmodes(projected_state::ProjectedPureGaussianState) = nmodes(projected_state.st)
 freemodes(projected_state::ProjectedPureGaussianState) = freemodes(projected_state.proj)
+nfreemodes(projected_state::ProjectedPureGaussianState) = nfreemodes(projected_state.proj)
 project(st::GaussianState, proj::ClickProjector; η::Vector{Float64}=ones(nmodes(st))) = ProjectedPureGaussianState(st, proj, η)
 
 """
@@ -204,7 +206,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     α = engine.α
     β = engine.β
     proj = projected_state.proj
-    count(proj.clicks[1,:] .== -1) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
+    nfreemodes(projected_state) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
 
     gstate = changebasis(QuadBlockBasis, st)
     σ = gstate.covar ./ gstate.ħ
@@ -237,8 +239,7 @@ fidelity(target::ClickStateBra, projected_state::ProjectedPureGaussianState; eng
 Computes the unnormalized Fock-basis photon-photon density matrix of a projected pure Gaussian state
 """
 function to_fock(projected_state::ProjectedPureGaussianState; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)), cutoff::Int=2)::Operator
-    proj = projected_state.proj
-    m = count(proj.clicks[1,:] .== -1) # Number of modes to include in the resulting density matrix (traceout placement is consistent across terms)
+    m = nfreemodes(projected_state) # Number of modes to include in the resulting density matrix (traceout placement is consistent across terms)
     basis = reduce(⊗, fill(FockBasis(cutoff), m)) # (cutoff+1)^m-dimensional Hilbert space for the density matrix
 
     sz = length(basis)
@@ -265,10 +266,9 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
     β = engine.β
     proj = projected_state.proj
     η = projected_state.η
-    mds = engine.mds
 
     length(d) == 2length(modes) || throw(ArgumentError("Duan-Kimble loading requires one outcome per mode"))
-    count(proj.clicks[1,:] .== -1) == 2length(modes) || throw(ArgumentError("Duan-Kimble loading requires that the projected state has traceout on the modes to be loaded"))
+    nfreemodes(projected_state) == 2length(modes) || throw(ArgumentError("Duan-Kimble loading requires that the projected state has traceout on the modes to be loaded"))
 
     n_mem = length(modes)
     M = 2^n_mem
@@ -286,19 +286,27 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
         for r in 0:M-1, s in 0:M-1
             C = @lock engine.C_poly_cache_ext_lock get!(engine.C_poly_cache_ext, (nf, η, d, r, s)) do
                 C = prod((α.*β).^nf ./ factorial.(nf))
-                for (a,(i,j)) in enumerate(modes)
-                    if (r >> (a-1)) & 1 == 0
+                mask = 0x1
+                a = 1
+                for (i,j) in modes
+                    if r & mask == 0
                         C *= (α[i]*√η[i] - α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] + α[j]*√η[j])^d[2a]
                     else
                         C *= (α[i]*√η[i] + α[j]*√η[j])^d[2a-1] * (α[i]*√η[i] - α[j]*√η[j])^d[2a]
                     end
+                    mask <<= 1
+                    a += 1
                 end
-                for (b,(i,j)) in enumerate(modes)
-                    if (s >> (b-1)) & 1 == 0
-                        C *= (β[i]*√η[i] - β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2b]
+                mask = 0x1
+                a = 1
+                for (i,j) in modes
+                    if s & mask == 0
+                        C *= (β[i]*√η[i] - β[j]*√η[j])^d[2a-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2a]
                     else
-                        C *= (β[i]*√η[i] + β[j]*√η[j])^d[2b-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2b]
+                        C *= (β[i]*√η[i] + β[j]*√η[j])^d[2a-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2a]
                     end
+                    mask <<= 1
+                    a += 1
                 end
                 C |> extract_W_terms
             end
