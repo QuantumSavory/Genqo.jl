@@ -1,8 +1,9 @@
 @testitem "HybridProjectionEngine construction" begin
     engine = HybridProjectionEngine(3)
+    α, βc = get_phase_space_generators_half(engine)
     @test engine.mds == 3
-    @test length(engine.α) == 3
-    @test length(engine.β) == 3
+    @test length(α) == 3
+    @test length(βc) == 3
     @test isempty(engine.C_poly_cache)
 end
 

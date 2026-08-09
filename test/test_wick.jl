@@ -35,39 +35,39 @@ end
     # HybridProjectionEngine(6) provides 24 phase-space variables; its α/β are the standard
     # multilinear building blocks for moment polynomials
     engine = HybridProjectionEngine(6)
-    α, β = engine.α, engine.β
+    α, βc = get_phase_space_generators_half(engine)
     CC = Nemo.ComplexField()
 
     B = rand(StableRNG(2), ComplexF64, 12, 12)
     Ainv = B + transpose(B)
 
     # Mixed-degree multilinear polynomial: degrees 4 and 8, complex coefficients
-    C = (2 + Nemo.onei(CC)) * α[1] * α[2] * β[1] * β[2] +
-        CC(0.5) * α[1] * α[2] * α[3] * α[4] * β[1] * β[2] * β[3] * β[4]
+    C = (2 + Nemo.onei(CC)) * α[1] * α[2] * βc[1] * βc[2] +
+        CC(0.5) * α[1] * α[2] * α[3] * α[4] * βc[1] * βc[2] * βc[3] * βc[4]
     @test W(extract_W_terms(C), Ainv) ≈ W(C, Ainv)
 
     # Degree 12 exceeds the @generated hafnian's full-unroll limit (K=10), exercising
     # the recursive expansion against the partition-enumerating symbolic path
-    C12 = prod(α) * prod(β)
+    C12 = prod(α) * prod(βc)
     @test W(extract_W_terms(C12), Ainv) ≈ W(C12, Ainv)
 
     # Odd-degree monomials contract to zero
-    @test W(extract_W_terms(α[1] * α[2] * β[1]), Ainv) ≈ 0 atol = 1e-14
+    @test W(extract_W_terms(α[1] * α[2] * βc[1]), Ainv) ≈ 0 atol = 1e-14
 
     # W throws error when the size of Ainv is inconsistent with the number of variables in the polynomial ring WTerms came from
-    @test_throws DimensionMismatch W(α[1] * α[2] * β[1] * β[2], Ainv[1:10, 1:10])
-    @test_throws DimensionMismatch W(extract_W_terms(α[1] * α[2] * β[1] * β[2]), Ainv[1:10, 1:10])
+    @test_throws DimensionMismatch W(α[1] * α[2] * βc[1] * βc[2], Ainv[1:10, 1:10])
+    @test_throws DimensionMismatch W(extract_W_terms(α[1] * α[2] * βc[1] * βc[2]), Ainv[1:10, 1:10])
 end
 
 @testitem "WTerms algebra" begin
     using StableRNGs
 
     engine = HybridProjectionEngine(2)
-    α, β = engine.α, engine.β
+    α, βc = get_phase_space_generators_half(engine)
     B = rand(StableRNG(3), ComplexF64, 4, 4)
     Ainv = B + transpose(B)
 
-    t = extract_W_terms(α[1] * α[2] * β[1] * β[2])
+    t = extract_W_terms(α[1] * α[2] * βc[1] * βc[2])
     w = W(t, Ainv)
 
     @test W(2.5 * t, Ainv) ≈ 2.5 * w

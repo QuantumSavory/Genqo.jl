@@ -10,7 +10,9 @@ export
     # Types
     AbstractClickState, ClickStateKet, ClickStateBra, AbstractClickOperator, ClickProjector, AbstractProjectionEngine, HybridProjectionEngine, AbstractProjectedState, AbstractProjectedPureGaussianState, ProjectedPureGaussianState,
     # Functions
-    clicks, projector, norm, get_default_engine, project, tr, dot, fidelity, to_fock, duankimble
+    clicks, projector, norm, get_phase_space_generators_half, get_phase_space_generators_full, get_default_engine, project, tr, dot, fidelity, to_fock, duankimble, emissiveload, nmodes, nfreemodes, freemodes,
+    # Re-exported from QuantumOpticsBase
+    Operator
 
 
 # TODO: inherit from something in QuantumOptics.jl and make this a full-fledged state
@@ -104,8 +106,11 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     mds::Int
 
     # Phase-space variables for symbolic calculations
-    α::Vector{Generic.MPoly{ComplexFieldElem}}
-    β::Vector{Generic.MPoly{ComplexFieldElem}}
+    # Most calculations only require α and βc, allowing us to use the smaller upper-left block of the A⁻¹ matrix for the Wick contractions. For this, phase_space_generators_half is used.
+    # For calculations that require α βc αc and β, and hence the full A⁻¹ matrix, phase_space_generators_full is used.
+    # The two sets of generators are kept separate so that A⁻¹ can be properly bounds-checked against the number of modes in the ring.
+    phase_space_generators_half::Array{Generic.MPoly{ComplexFieldElem},2}
+    phase_space_generators_full::Array{Generic.MPoly{ComplexFieldElem},2}
 
     # Cache for C polynomials (α_click, β_click) => contraction terms
     C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}
@@ -117,21 +122,22 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     function HybridProjectionEngine(mds::Int)
         # Define phase-space variables for the circuit
         _αi = ["α$i" for i in 1:mds]
+        _βci = ["βc$i" for i in 1:mds]
+        _αci = ["αc$i" for i in 1:mds]
         _βi = ["β$i" for i in 1:mds]
         CC = ComplexField()
-        R, generators = polynomial_ring(CC, hcat(_αi, _βi))
-
-        # Define the α and β* vectors (note that β is understood to refer to the β* block)
-        α = generators[:,1]
-        β = generators[:,2]
+        R_half, generators_half = polynomial_ring(CC, hcat(_αi, _βci))
+        R_full, generators_full = polynomial_ring(CC, hcat(_αi, _βci, _αci, _βi))
 
         new(
-            mds, α, β,
+            mds, generators_half, generators_full,
             Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}(), ReentrantLock(),
             Dict{Tuple{Vector{Int8}, Vector{Float64}, Vector{Int8}, Int8, Int8}, WTerms}(), ReentrantLock(),
         )
     end
 end
+get_phase_space_generators_half(engine::HybridProjectionEngine) = (engine.phase_space_generators_half[:,i] for i in 1:2)
+get_phase_space_generators_full(engine::HybridProjectionEngine) = (engine.phase_space_generators_full[:,i] for i in 1:4)
 const _default_engines = Dict{Int, HybridProjectionEngine}()
 function get_default_engine(mds::Int)
     get!(_default_engines, mds) do
@@ -169,8 +175,7 @@ function tr(projected_state::ProjectedPureGaussianState; engine::HybridProjectio
     nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
 
     st = projected_state.st
-    α = engine.α
-    β = engine.β
+    α, βc = get_phase_space_generators_half(engine)
     proj = projected_state.proj
     η = projected_state.η
 
@@ -188,7 +193,7 @@ function tr(projected_state::ProjectedPureGaussianState; engine::HybridProjectio
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
             # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
             # tools.W() will need to be generalized
-            prod((α.*β).^nf ./ factorial.(nf)) |> extract_W_terms
+            prod((α.*βc).^nf ./ factorial.(nf)) |> extract_W_terms
         end
 
         Tr += W(C, invA) * ηweight / denom
@@ -203,8 +208,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
 
     st = projected_state.st
     η = projected_state.η
-    α = engine.α
-    β = engine.β
+    α, βc = get_phase_space_generators_half(engine)
     proj = projected_state.proj
     nfreemodes(projected_state) == nmodes(bra) == nmodes(ket) || throw(ArgumentError("Bra and ket must have the same number of modes as the projected state"))
 
@@ -222,7 +226,7 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
             bcl_full[n .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
             kcl_full[n .== -1] .= kcl
             Cij = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (bcl_full, kcl_full)) do
-                prod(α .^ bcl_full) * prod(β .^ kcl_full) |> extract_W_terms
+                prod(α .^ bcl_full) * prod(βc .^ kcl_full) |> extract_W_terms
             end
             ηweight = prod(η.^((bcl_full.+kcl_full)./2) ./ (sqrt.(factorial.(bcl_full)) .* sqrt.(factorial.(kcl_full)))) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
             C += bcf * kcf * ηweight * Cij
@@ -255,6 +259,11 @@ function to_fock(projected_state::ProjectedPureGaussianState; engine::HybridProj
     dm
 end
 
+function _pair(modes::Vector{Int})
+    iseven(length(modes)) || throw(ArgumentError("Loading of dual-rail states requires an even number of modes"))
+    [(modes[2i-1], modes[2i]) for i in Base.OneTo(length(modes) ÷ 2)]
+end
+
 """
 Models Duan-Kimble loading into a spin quantum memory
 """
@@ -262,8 +271,7 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
     nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
 
     st = projected_state.st
-    α = engine.α
-    β = engine.β
+    α, βc = get_phase_space_generators_half(engine)
     proj = projected_state.proj
     η = projected_state.η
 
@@ -285,7 +293,7 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
 
         for r in 0:M-1, s in 0:M-1
             C = @lock engine.C_poly_cache_ext_lock get!(engine.C_poly_cache_ext, (nf, η, d, r, s)) do
-                C = prod((α.*β).^nf ./ factorial.(nf))
+                C = prod((α.*βc).^nf ./ factorial.(nf))
                 mask = 0x1
                 a = 1
                 for (i,j) in modes
@@ -301,9 +309,9 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
                 a = 1
                 for (i,j) in modes
                     if s & mask == 0
-                        C *= (β[i]*√η[i] - β[j]*√η[j])^d[2a-1] * (β[i]*√η[i] + β[j]*√η[j])^d[2a]
+                        C *= (βc[i]*√η[i] - βc[j]*√η[j])^d[2a-1] * (βc[i]*√η[i] + βc[j]*√η[j])^d[2a]
                     else
-                        C *= (β[i]*√η[i] + β[j]*√η[j])^d[2a-1] * (β[i]*√η[i] - β[j]*√η[j])^d[2a]
+                        C *= (βc[i]*√η[i] + βc[j]*√η[j])^d[2a-1] * (βc[i]*√η[i] - βc[j]*√η[j])^d[2a]
                     end
                     mask <<= 1
                     a += 1
@@ -316,11 +324,107 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
     ρ.data ./= 2^sum(d) * 4
     ρ
 end
-function _pair(modes::Vector{Int})
-    iseven(length(modes)) || throw(ArgumentError("Duan-Kimble loading requires an even number of modes"))
-    [(modes[2i-1], modes[2i]) for i in 1:(length(modes) ÷ 2)]
+
+"""
+Models emissive loading into a quantum memory
+"""
+function emissiveload(projected_state::ProjectedPureGaussianState, load::Vector{Tuple{Int,Int}}=_pair(freemodes(projected_state)), emit::Vector{Tuple{Int,Int}}=collect((nmodes(projected_state)+2h-1,nmodes(projected_state)+2h) for h in Base.OneTo(length(load))); engine=get_default_engine(nmodes(projected_state.st)+2length(load)))::Operator
+    st = projected_state.st
+    α, βc, αc, β = get_phase_space_generators_full(engine)
+    proj = projected_state.proj
+    η = projected_state.η
+    mds = engine.mds
+
+    nmodes_st = nmodes(st)
+    n_mem = length(load)
+    M = 2^n_mem
+
+    mds == nmodes_st + 2n_mem || throw(ArgumentError("Emissive loading requires an engine with enough modes for the state plus an extra for each loaded mode"))
+    length(emit) == n_mem || throw(ArgumentError("Emissive loading requires one emission per loaded mode"))
+    nfreemodes(projected_state) == 2n_mem || throw(ArgumentError("Emissive loading requires that the projected state has traceout on the modes to be loaded"))
+
+    gstate = changebasis(QuadBlockBasis, st) ⊗ vacuumstate(QuadBlockBasis(2n_mem))
+    σ = gstate.covar ./ gstate.ħ
+
+    ρ = Operator(reduce(⊗, fill(SpinBasis(1//2), n_mem)), zeros(ComplexF64, M, M))
+    for n in eachrow(proj.clicks)
+        nfp = vcat(max.(n, 0), zeros(Int64, 2n_mem)) # Filter out -1 (traceout) modes
+        ηp = vcat(η, ones(Float64, 2n_mem)) # Pad η to include the emission modes, assuming no loss
+        invA, denom = _invA(σ, ηp, nfp)
+
+        for r in 0:M-1, s in 0:M-1
+            C = prod((α.*βc.*ηp).^nfp ./ factorial.(nfp))
+            for (a, ((i,j), (k,l))) in enumerate(zip(load, emit))
+                C *= (α[i]*√ηp[i] + α[k]*√ηp[k]) * (α[j]*√ηp[j] + α[l]*√ηp[l]) * (βc[i]*√ηp[i] + βc[k]*√ηp[k]) * (βc[j]*√ηp[j] + βc[l]*√ηp[l])
+            end
+
+            mask = 0x1
+            for (i,j) in emit
+                if r & mask == 0
+                    C *= αc[j]
+                else
+                    C *= αc[i]
+                end
+                mask <<= 1
+            end
+            mask = 0x1
+            for (i,j) in emit
+                if s & mask == 0
+                    C *= β[j]
+                else
+                    C *= β[i]
+                end
+                mask <<= 1
+            end
+            ρ.data[r+1,s+1] += W(extract_W_terms(C), invA) / denom
+        end
+    end
+    ρ.data ./= 4^n_mem * 2
+    ρ
 end
 
+
+function _invA(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int})::Tuple{Matrix{ComplexF64}, Float64}
+    size(σ, 1) == size(σ, 2) || throw(ArgumentError("Covariance matrix must be square"))
+    mds = size(σ, 1) ÷ 2
+    length(n) == length(η) == mds || throw(ArgumentError("Length of n and η must match number of modes in covariance matrix"))
+
+    Γ = σ + 0.5*I
+    Γinv = inv(Γ)
+
+    # Views of Γinv blocks
+    a  = @view Γinv[1:mds,      1:mds     ]
+    c  = @view Γinv[1:mds,      mds+1:2mds]
+
+    cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
+    b  = @view Γinv[mds+1:2mds, mds+1:2mds]
+
+    @assert 0.5 * (a + b - im*(c - cᵀ)) ≈ I # Ã purity check
+
+    C̃ = 0.5 * (a - b + im*(c + cᵀ))
+    y = ones(ComplexF64, mds)
+    y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
+    Y = Diagonal(y)
+
+    # Compute A matrix from blocks (block ordering: [α β* α* β])
+    A = zeros(ComplexF64, 4mds, 4mds)
+
+    copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
+    copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
+    copyto!(view(A, 1:mds,       2mds+1:3mds), I)
+    copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
+    copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
+    copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
+    copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
+    conj!(C̃)
+    copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
+
+    invA = inv(A)
+    detA = det(A)
+
+    denom = sqrt(real(detA)) * sqrt(abs(det(Γ)))
+    (invA, denom)
+end
 
 function _invA_UL(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int})::Tuple{Matrix{ComplexF64}, Float64}
     size(σ, 1) == size(σ, 2) || throw(ArgumentError("Covariance matrix must be square"))
