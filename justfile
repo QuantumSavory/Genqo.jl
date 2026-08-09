@@ -12,11 +12,11 @@ install:
 
 # Run the Julia test suite (v2 validated against precomputed v1 ground truth)
 test:
-    JULIA_NUM_THREADS=8 julia --project=. -e 'using Pkg; Pkg.test()'
+    JULIA_NUM_THREADS=12 julia --project=. -e 'using Pkg; Pkg.test()'
 
 # Regenerate the v1 ground-truth data used by the Julia test suite (commit the result)
 ground-truth:
-    julia --project=test/ -t 8 test/generate_ground_truth.jl
+    julia --project=test/ -t 12 test/generate_ground_truth.jl
 
 # Run tests comparing Julia and Python genqo implementations
 test-py:
@@ -32,7 +32,7 @@ test-py:
 
 # Run Julia benchmarks for <func>, e.g. just bench project.tr (benchmarks all by default)
 bench func="":
-    julia --project=benchmark/ -t 8 benchmark/benchmarks.jl "{{func}}"
+    julia --project=benchmark/ -t 12 benchmark/benchmarks.jl "{{func}}"
 
 # Run benchmarks comparing Julia and Python genqo for <func>, e.g. just bench-py spdc.spin_density_matrix (benchmarks all by default)
 bench-py func="":
