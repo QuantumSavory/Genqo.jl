@@ -111,9 +111,7 @@ function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
     for (mon, coeff) in zip(monomials(C), coefficients(C))
         idxs = Int[]
         for i in 1:n_vars
-            if exponent(mon, 1, i) == 1
-                push!(idxs, i)
-            end
+            push!(idxs, fill(i, exponent(mon, 1, i))...) # for the nth power of a variable, push n copies of its index
         end
         N = length(idxs)
         cv, iv = get!(by_deg, N) do
@@ -248,7 +246,12 @@ function W(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}, Ainv::Matrix{ComplexF64
     n_vars == size(Ainv, 1) == size(Ainv, 2) || throw(DimensionMismatch("Ainv must be a square matrix of size $n_vars×$n_vars to contract against a $(n_vars÷2)-mode polynomial, got $(size(Ainv, 1))×$(size(Ainv, 2))"))
     elm = zero(ComplexF64)
     for (mon, coeff) in zip(monomials(C), coefficients(C))
-        elm += coeff * wick_out([i for i in 1:n_vars if exponent(mon, 1, i) == 1], Ainv)
+        ξ = Int[]
+        for i in 1:n_vars
+            # TODO: Use Kan's identity to speed this up for repeated indices instead of pushing multiple copies of the same index and letting the hafnian recursion handle the redundant terms.
+            push!(ξ, fill(i, exponent(mon, 1, i))...) # for the nth power of a variable, push n copies of its index
+        end
+        elm += coeff * wick_out(ξ, Ainv)
     end
     return elm
 end
@@ -258,7 +261,7 @@ Evaluate a single monomial term via Wick's theorem (sum over perfect pairings).
 """
 function wick_out(moment::Vector{Int}, Ainv::Matrix{ComplexF64})::ComplexF64
     N = length(moment)
-    iseven(N) || return 0 # monomial with odd number of variables has no PMP set
+    iseven(N) || return zero(ComplexF64) # monomial with odd number of variables has no PMP set
 
     # Iterate over Wick partitions
     s = zero(ComplexF64)
