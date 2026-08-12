@@ -24,7 +24,7 @@ function plot_spdc1_probability()
     Pgen = tr.(states)
     Pgen_ground = ones(100)
 
-    plot(μ, Pgen_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=[1 2 3 4])
+    plot(μ, Pgen_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", title="SPDC: Probability of generation", legend=:bottomright, dpi=300, color=[1 2 3 4])
     plot!(μ, Pgen, label="Genqo v2", linestyle=:dash, color=[:blue :orange :green :red])
 end
 @time plot_spdc1_probability()
@@ -38,7 +38,7 @@ function plot_spdc1_fidelity()
     F = @. real(dot([ψ⁺'], states, [ψ⁺])) / tr(states)
     F_ground = spdc.fidelity.(μ, η', 1.)
 
-    plot(μ, F_ground, label="Genqo v1 (ground truth)", xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])
+    plot(μ, F_ground, label="Genqo v1 (ground truth)", xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", title="SPDC: Fidelity", legend=:topleft, dpi=300, color=[1 2 3 4])
     plot!(μ, F, label="Genqo v2", linestyle=:dash, color=[:blue :orange :green :red])
 end
 @time plot_spdc1_fidelity()

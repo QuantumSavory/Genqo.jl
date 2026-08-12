@@ -23,16 +23,21 @@ end
 ## Probability of generation
 function plot_pbp3_probability()
     μ = range(1e-3, 1, 100)
-    η = [1., 0.8, 0.5, 0.25]
-    states = pbp3.(μ, 1., η', η')
+    ηT = [1., 0.8, 0.5, 0.25]
+    states = pbp3.(μ, 1., ηT', ηT')
     Pgen = tr.(states)
 
-    plot(μ, Pgen[:,1], label="\\eta = 1.0", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=1)
-    plot!(μ, Pgen[:,2], label="\\eta = 0.8", color=2)
-    plot!(μ, Pgen[:,3], label="\\eta = 0.5", color=3)
-    plot!(μ, Pgen[:,4], label="\\eta = 0.25", color=4)
+    local p
+    for (i,ηTi) in enumerate(ηT)
+        if i == 1
+            p = plot(μ, Pgen[:,i], label="\\eta = $ηTi", xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", title="PBP3: Probability of generation", legend=:bottomright, dpi=300, color=i)
+        else
+            plot!(p, μ, Pgen[:,i], label="\\eta = $ηTi", color=i)
+        end
+    end
     # True 3-pair heralds + 4-pair false heralds (both photons of an outer-source double pair detected in the same BSM)
-    plot!(μ, μ.^3 ./ (μ.+1).^9 ./ 8 .+ μ.^4 ./ (μ.+1).^10 ./ 16, label="\\eta = 1.0 analytical", linestyle=:dash, color=:blue)
+    plot!(p, μ, μ.^3 ./ (μ.+1).^9 ./ 8 .+ μ.^4 ./ (μ.+1).^10 ./ 16, label="\\eta = 1.0 analytical", linestyle=:dash, color=:blue)
+    p
 end
 @time plot_pbp3_probability()
 
@@ -44,10 +49,15 @@ function plot_pbp3_fidelity()
     ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
     F = @. real(dot([ψ⁺'], states, [ψ⁺])) / tr(states)
 
-    plot(μ, F[:,1], label="\\eta = 1.0", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright, color=1)
-    plot!(μ, F[:,2], label="\\eta = 0.8")
-    plot!(μ, F[:,3], label="\\eta = 0.5")
-    plot!(μ, F[:,4], label="\\eta = 0.25")
+    local p
+    for (i,ηi) in enumerate(η)
+        if i == 1
+            p = plot(μ, F[:,i], label="\\eta = $ηi", ylim=[0,1], xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", title="PBP3: Fidelity", legend=:bottomright, dpi=300, color=i)
+        else
+            plot!(p, μ, F[:,i], label="\\eta = $ηi", color=i)
+        end
+    end
+    p
 end
 @time plot_pbp3_fidelity()
 
@@ -57,7 +67,7 @@ function plot_pbp3_distillable_entanglement_rate()
     ηR = 0.01
     ηT = 1.0:-0.1:0.6
     states = pbp3.(μ, ηR, ηT', ηT')
-    ρAB = duankimble.(states, [[1,0,1,0]]) .* 4
+    ρAB = duankimble.(states, [[1,0,1,0]]) .* 4^2
     Pgen = tr.(ρAB) .|> real
     ρAB ./= Pgen
 
@@ -70,10 +80,14 @@ function plot_pbp3_distillable_entanglement_rate()
     # Compute distillable entanglement rate
     R = max.(I .* Pgen, 1e-20) # send nonpositive numbers to 1e-20 for log scale
 
-    plot(μ, R[:,1], label="\\eta_T = $(ηT[1])", xlabel="Mean Photon Number Per Mode", ylabel="Distillable Entanglement Rate", xscale=:log10, yscale=:log10, legend=:topleft)
-    plot!(μ, R[:,2], label="\\eta_T = $(ηT[2])")
-    plot!(μ, R[:,3], label="\\eta_T = $(ηT[3])")
-    plot!(μ, R[:,4], label="\\eta_T = $(ηT[4])")
-    plot!(μ, R[:,5], label="\\eta_T = $(ηT[5])")
+    local p
+    for (i,ηTi) in enumerate(ηT)
+        if i == 1
+            p = plot(μ, R[:,i], label="\\eta_T = $ηTi", xlabel="Mean Photon Number Per Mode", ylabel="Distillable Entanglement Rate", title="PBP3: Distillable entanglement rate", xscale=:log10, yscale=:log10, xticks=10. .^ (-4:1), yticks=10. .^ (-14:2:-4), xlim=[1e-4,1e1], ylim=[1e-14,1e-4], legend=:topleft, dpi=300, color=i)
+        else
+            plot!(p, μ, R[:,i], label="\\eta_T = $ηTi", color=i)
+        end
+    end
+    p
 end
 @time plot_pbp3_distillable_entanglement_rate()

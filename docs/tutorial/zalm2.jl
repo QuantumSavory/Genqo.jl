@@ -26,7 +26,7 @@ function plot_zalm2_probability()
     Pgen = tr.(states)
     Pgen_ground = zalm.probability_success.(μ, 1., 1., η', 0)
 
-    plot(μ, Pgen_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", legend=:bottomright, color=[1 2 3 4])
+    plot(μ, Pgen_ground, label="Genqo v1 (ground truth)", xscale=:log10, yscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Probability of Generation", title="ZALM: Probability of generation", legend=:bottomright, dpi=300, color=[1 2 3 4])
     plot!(μ, Pgen, label="Genqo v2", linestyle=:dash, color=[:blue :orange :green :red])
     plot!(μ, μ.^2 ./ (μ.+1).^6, label="Analytical", linestyle=:dot, color=:black)
 end
@@ -75,7 +75,7 @@ function plot_zalm2_Bell_state_fraction()
     PBell = zalm2_PBell.(μ, 1., 0.9)
     B = PBell ./ Pload
     
-    plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", legend=:bottomright, color=1)
+    plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", title="ZALM: Bell-state fraction", legend=:bottomright, dpi=300, color=1)
 end
 @time plot_zalm2_Bell_state_fraction()
 
@@ -91,7 +91,7 @@ function plot_zalm2_fidelity()
     end
     F_ground = zalm.fidelity.(μ, 1., 1., η')
 
-    plot(μ, F_ground, label="Genqo v1 (ground truth)", ylim=[0,1], xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])
+    plot(μ, F_ground, label="Genqo v1 (ground truth)", ylim=[0,1], xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", title="ZALM: Fidelity", legend=:topleft, dpi=300, color=[1 2 3 4])
     plot!(μ, F, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
 end
 @time plot_zalm2_fidelity()
@@ -123,27 +123,99 @@ function plot_zalm2_distillable_entanglement_rate()
     ηR = 0.01
     ηT = 1.0:-0.1:0.6
     states = zalm2.(μ, ηR, ηT')
-    ρAB = similar(states, Operator)
-    Pgen = similar(states, Float64)
+    ρABD = similar(states, Operator)
+    PgenD = similar(states, Float64)
+    ρABE = similar(states, Operator)
+    PgenE = similar(states, Float64)
     Threads.@threads for I in CartesianIndices(states)
-        ρAB[I] = duankimble(states[I], [1,0,1,0]) * 4
-        Pgen[I] = tr(ρAB[I])
-        ρAB[I] /= Pgen[I]
+        ρABD[I] = duankimble(states[I], [1,0,1,0]) * 4
+        PgenD[I] = tr(ρABD[I])
+        ρABD[I] /= PgenD[I]
+        ρABE[I] = emissiveload(states[I]) * 4
+        PgenE[I] = tr(ρABE[I])
+        ρABE[I] /= PgenE[I]
     end
 
     # Compute Hashing bound
-    SρAB = @. entropy_vn(ρAB) |> real
-    SρA = @. entropy_vn(ptrace(ρAB, 2)) |> real
-    SρB = @. entropy_vn(ptrace(ρAB, 1)) |> real
-    I = max.(SρA - SρAB, SρB - SρAB)
+    SρABD = @. entropy_vn(ρABD) |> real
+    SρA = @. entropy_vn(ptrace(ρABD, 2)) |> real
+    SρB = @. entropy_vn(ptrace(ρABD, 1)) |> real
+    I = max.(SρA - SρABD, SρB - SρABD)
+
+    SρABE = @. entropy_vn(ρABE) |> real
+    SρA = @. entropy_vn(ptrace(ρABE, 2)) |> real
+    SρB = @. entropy_vn(ptrace(ρABE, 1)) |> real
+    I = max.(SρA - SρABE, SρB - SρABE)
 
     # Compute distillable entanglement rate
-    R = max.(I .* Pgen, 1e-20) # send nonpositive numbers to 1e-20 for log scale
+    RD = max.(I .* PgenD, 1e-20) # send nonpositive numbers to 1e-20 for log scale
+    RE = max.(I .* PgenE, 1e-20) # send nonpositive numbers to 1e-20 for log scale
 
-    plot(μ, R[:,1], label="\\eta_T = $(ηT[1])", xlabel="Mean Photon Number Per Mode", ylabel="Distillable Entanglement Rate", xscale=:log10, yscale=:log10, xticks=10. .^ (-4:1), yticks=10. .^ (-14:2:-4), xlim=[1e-4,1e1], ylim=[1e-14,1e-4], legend=:topleft)
-    plot!(μ, R[:,2], label="\\eta_T = $(ηT[2])")
-    plot!(μ, R[:,3], label="\\eta_T = $(ηT[3])")
-    plot!(μ, R[:,4], label="\\eta_T = $(ηT[4])")
-    plot!(μ, R[:,5], label="\\eta_T = $(ηT[5])")
+    local p
+    for i in eachindex(ηT)
+        if i == 1
+            p = plot(μ, RD[:,i], label="\\eta_T = $(ηT[i])", xlabel="Mean Photon Number Per Mode", ylabel="Distillable Entanglement Rate", title="ZALM: Distillable entanglement rate", xscale=:log10, yscale=:log10, xticks=10. .^ (-4:1), yticks=10. .^ (-14:2:-4), xlim=[1e-4,1e1], ylim=[1e-14,1e-4], legend=:topleft, dpi=300, color=i)
+        else
+            plot!(μ, RD[:,i], label="\\eta_T = $(ηT[i])", color=i)
+        end
+    end
+    for i in eachindex(ηT)
+        plot!(μ, RE[:,i], label="", linestyle=:dash, color=i)
+    end
+    plot!([NaN], [NaN], label="Duan-Kimble loading", color=:black, linestyle=:solid)
+    plot!([NaN], [NaN], label="Emissive loading", color=:black, linestyle=:dash)
+    p
 end
 @time plot_zalm2_distillable_entanglement_rate()
+
+## Spin-spin fidelity
+function plot_zalm2_spin_fidelity()
+    μ = logrange(1e-4, 10, 100)
+    ηR = 0.01
+    ηT = 1.0:-0.1:0.6
+    states = zalm2.(μ, ηR, ηT')
+    ρD = similar(states, Operator)
+    PgenD = similar(states, Float64)
+    ρE = similar(states, Operator)
+    PgenE = similar(states, Float64)
+    Threads.@threads for I in CartesianIndices(states)
+        ρD[I] = duankimble(states[I], [1,0,1,0]) * 4
+        PgenD[I] = tr(ρD[I])
+        ρD[I] /= PgenD[I]
+        ρE[I] = emissiveload(states[I]) * 4
+        PgenE[I] = tr(ρE[I])
+        ρE[I] /= PgenE[I]
+    end
+
+    fidelityD(ρi::Operator) = dot([1,0,0,-1]'/√2, ρi.data, [1,0,0,-1]/√2) / tr(ρi) |> real
+    fidelityE(ρi::Operator) = dot([0,1,1,0]'/√2, ρi.data, [0,1,1,0]/√2) / tr(ρi) |> real
+    FsD = fidelityD.(ρD)
+    FsE = fidelityE.(ρE)
+    local p
+    for i in eachindex(ηT)
+        if i == 1
+            p = plot(μ, FsD[:,i], label="\\eta_T = $(ηT[i])", xlabel="Mean Photon Number Per Mode", ylabel="Spin-spin Fidelity", title="ZALM: Spin-spin fidelity", xscale=:log10, legend=:bottomleft, dpi=300, color=i)
+        else
+            plot!(p, μ, FsD[:,i], label="\\eta_T = $(ηT[i])", color=i)
+        end
+    end
+    for i in eachindex(ηT)
+        plot!(p, μ, FsE[:,i], label="", linestyle=:dash, color=i)
+    end
+    plot!(p, [NaN], [NaN], label="Duan-Kimble loading", color=:black, linestyle=:solid)
+    plot!(p, [NaN], [NaN], label="Emissive loading", color=:black, linestyle=:dash)
+    p
+end
+@time plot_zalm2_spin_fidelity()
+
+## Emissive loading
+function zalm2_spin_density_matrix_emissive()
+    μ = 0.2
+    ηR = 0.01
+    ηT = 0.8
+    state = zalm2(μ, ηR, ηT)
+    ρ = emissiveload(state) * 4
+    
+    display(ρ)
+end
+@time zalm2_spin_density_matrix_emissive()
