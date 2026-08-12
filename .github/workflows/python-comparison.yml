@@ -19,6 +19,9 @@ on:
       - "python/**"
       - ".github/workflows/python-comparison.yml"
 
+permissions:
+  contents: read
+
 jobs:
   python-comparison-tests:
     name: Python Comparison Tests
