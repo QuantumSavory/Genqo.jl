@@ -217,17 +217,17 @@ function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ke
     Dot = zero(ComplexF64)
     for n in eachrow(proj.clicks)
         nf = max.(n, 0) # Filter out -1 (traceout) modes
-        invA, denom = _invA_UL(σ, η, nf) # A_Ψ is same as A_P, just with no traceout modes
+        invA, denom = _invA_UL(σ, η, nf) # A_F is same as A_P, just with no traceout modes
 
         C = zero(WTerms{Tuple{}}) # Start with empty WTerms
         for (bcf, bcl) in zip(bra.coefs, eachrow(bra.clicks)), (kcf, kcl) in zip(ket.coefs, eachrow(ket.clicks))
-            bcl_full, kcl_full = copy(n), copy(n)
-            bcl_full[n .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
-            kcl_full[n .== -1] .= kcl
-            Cij = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (bcl_full, kcl_full)) do
-                prod(α .^ bcl_full) * prod(βc .^ kcl_full) |> extract_W_terms
+            u, v = copy(n), copy(n)
+            u[n .== -1] .= bcl # Build full click patterns for the bra and ket, filling in the undetected modes with the click patterns from the bra and ket
+            v[n .== -1] .= kcl
+            Cij = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (u, v)) do
+                prod(α .^ u) * prod(βc .^ v) |> extract_W_terms
             end
-            ηweight = prod(η.^((bcl_full.+kcl_full)./2) ./ (sqrt.(factorial.(bcl_full)) .* sqrt.(factorial.(kcl_full)))) # √η per detected photon on each of the bra and ket sides, matching tr()'s per-click η factor
+            ηweight = prod(η.^((u.+v)./2) ./ (sqrt.(factorial.(u) .* factorial.(v)))) # √η per detected photon on each of the bra and ket sides
             C += bcf * kcf * ηweight * Cij
         end
 
