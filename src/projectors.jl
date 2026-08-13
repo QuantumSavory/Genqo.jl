@@ -113,10 +113,10 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     phase_space_generators_full::Array{Generic.MPoly{ComplexFieldElem},2}
 
     # Cache for C polynomials (α_click, β_click) => contraction terms
-    C_poly_cache::Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}
+    C_poly_cache::Dict{Tuple{Vector{Int}, Vector{Int}}, WTerms}
     const C_poly_cache_lock::ReentrantLock # for multithreading safety
 
-    C_poly_cache_ext::Dict{Tuple{Vector{Int8}, Vector{Float64}, Vector{Int8}, Int8, Int8}, WTerms}
+    C_poly_cache_ext::Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Int, Int}, WTerms}
     const C_poly_cache_ext_lock::ReentrantLock
 
     function HybridProjectionEngine(mds::Int)
@@ -131,16 +131,17 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
 
         new(
             mds, generators_half, generators_full,
-            Dict{Tuple{Vector{Int8}, Vector{Int8}}, WTerms}(), ReentrantLock(),
-            Dict{Tuple{Vector{Int8}, Vector{Float64}, Vector{Int8}, Int8, Int8}, WTerms}(), ReentrantLock(),
+            Dict{Tuple{Vector{Int}, Vector{Int}}, WTerms}(), ReentrantLock(),
+            Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Int, Int}, WTerms}(), ReentrantLock(),
         )
     end
 end
 get_phase_space_generators_half(engine::HybridProjectionEngine) = (engine.phase_space_generators_half[:,i] for i in 1:2)
 get_phase_space_generators_full(engine::HybridProjectionEngine) = (engine.phase_space_generators_full[:,i] for i in 1:4)
 const _default_engines = Dict{Int, HybridProjectionEngine}()
+const _default_engines_lock = ReentrantLock() # for multithreading safety
 function get_default_engine(mds::Int)
-    get!(_default_engines, mds) do
+    @lock _default_engines_lock get!(_default_engines, mds) do
         HybridProjectionEngine(mds)
     end
 end
@@ -191,8 +192,6 @@ function tr(projected_state::ProjectedPureGaussianState; engine::HybridProjectio
 
         ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
-            # TODO: support higher photon number outcomes as well, which will involve including the appropriate Fock term (αβ*)ⁿ/n! in the C polynomial
-            # tools.W() will need to be generalized
             prod((α.*βc).^nf ./ factorial.(nf)) |> extract_W_terms
         end
 
