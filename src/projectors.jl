@@ -421,7 +421,7 @@ function _invA(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int}):
     invA = inv(A)
     detA = det(A)
 
-    denom = sqrt(real(detA)) * sqrt(abs(det(Γ)))
+    denom = sqrt(real(detA) * abs(det(Γ)))
     (invA, denom)
 end
 
@@ -484,6 +484,6 @@ function _invA_UL(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int
         end
     end
 
-    denom = sqrt(real(detA)) * sqrt(abs(det(Γ)))
+    denom = sqrt(real(detA) * abs(det(Γ)))
     (invA_UL, denom)
 end
