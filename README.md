@@ -12,7 +12,10 @@
 - [Quickstart](#quickstart)
 
 ## Why Genqo?
-Genqo is an open-source tool for modeling quantum entanglement sources such as SPDC and ZALM. Genqo uses a hybrid Gaussian/non-Gaussian framework that avoids truncating the quantum state with a low mean photon number approximation. This allows the hybrid approach, unlike comparable perturbative approaches, to predict performance metrics accurately beyond the $N_s \approx 0.2$ mean photon number regime (see below).
+
+Genqo.jl is a package for efficiently modeling hybrid Gaussian / non-Gaussian CV quantum optics. It is useful for problems such as modeling entangled photon sources, general GBS-based multimode state preparation, and photonic quantum computing.
+
+Genqo provides an interface for working with non-Gaussian projections of Gaussian states in a computationally efficient manner. When a Gaussian state is projected onto a specific measurement outcome, an intermediate object is created that looks and feels like a density matrix. Methods on this intermediate type implement a closed form involving a matrix Hafnian, which is handed off to TheEggman.jl for fast evaluation. This approach sidesteps any computations involving truncated infinite-dimensional density operators, which are slow, memory-intensive, and inexact. 
 
 <div align="center">
 
@@ -21,18 +24,6 @@ Genqo is an open-source tool for modeling quantum entanglement sources such as S
 *Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after Ns = 0.2.*
 
 </div>
-
-Genqo allows for calculation of performance metrics such as entanglement rate, fidelity, and full density operators while sweeping mean photon number, dark counts, and various device and transmission losses. Thanks to Julia's JIT compilation feature, these metrics can be computed up to three orders of magnitude (130-1000x) faster than in Genqo's original Python implementation.
-
-<div align="center">
-
-![Comparison of Genqo benchmarks before and after moving to Julia implementation.](assets/images/benchmark_comparison.svg)
-
-*Comparison of Genqo benchmarks before and after moving to Julia implementation.*
-
-</div>
-
-Genqo.jl allows for simple integration with the full-stack quantum networking testbed [QuantumSavory.jl](https://github.com/QuantumSavory/QuantumSavory.jl), or usage as a standalone Python package through the Python wrapper.
 
 ## Installation
 
@@ -48,4 +39,4 @@ Try running the [tutorial notebook](docs/tutorial/hybrid_model_jl.ipynb) for an 
 
 ## Contact
 
-Please reach out at jacob.r.gunnell@gmail.com with any questions or ideas.
+Please reach out at jgunnell@umd.edu with any questions, collaborations, or ideas.
