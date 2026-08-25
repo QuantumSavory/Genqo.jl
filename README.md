@@ -1,5 +1,9 @@
 # Genqo.jl: A Hybrid Gaussian/non-Gaussian Quantum Optics Modeling Engine
 
+[![Stable](https://img.shields.io/badge/docs-stable-blue.svg)](https://QuantumSavory.github.io/Genqo.jl/stable/)
+[![Dev](https://img.shields.io/badge/docs-dev-blue.svg)](https://QuantumSavory.github.io/Genqo.jl/dev/)
+[![Build Status](https://github.com/QuantumSavory/Genqo.jl/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/QuantumSavory/Genqo.jl/actions/workflows/ci.yml?query=branch%3Amain)
+[![Coverage](https://codecov.io/gh/QuantumSavory/Genqo.jl/branch/main/graph/badge.svg)](https://codecov.io/gh/QuantumSavory/Genqo.jl)
 [![DOI](https://zenodo.org/badge/1114242875.svg)](https://doi.org/10.5281/zenodo.18870771)
 
 **Contents**
