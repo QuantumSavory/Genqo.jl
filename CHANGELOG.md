@@ -35,10 +35,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `tr(::ProjectedPureGaussianState)` asserted an exactly-zero imaginary part, which failed spuriously (imaginary residues ~1e-36) for circuit-built states; the assertion is now a relative tolerance.
 - Issue where the `Release` workflow mangled release notes that included text in backticks.
 
-### Fixed
-
-- The Python wrapper failed to import with recent juliacall releases: `juliacall.Pkg` was removed after 0.9.31 (now activated via Julia's own `Pkg`), and newer juliacall/PythonCall versions force Julia ≤ 1.11, incompatible with Genqo's Julia 1.12 requirement (juliacall is now pinned to 0.9.31).
-
 ## [1.2.0] - 2026-04-30
 
 ### Added
