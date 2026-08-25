@@ -21,6 +21,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Renamed justfile commands: `just test`/`just bench` now run the Julia test suite and the Julia benchmark suite; the Python comparison workflows moved to `just test-py`/`just bench-py` (the Julia half of the comparison benchmarks now lives in `test/python/bench.jl`).
 - The Python comparison tests moved out of the routine CI workflow into `.github/workflows/python-comparison.yml`, which runs only when legacy/Python-reference code changes or on manual dispatch.
 - The `Release` workflow now refuses to run unless it is dispatched from `main`, so a `@JuliaRegistrator register` comment cannot be posted against a feature-branch commit.
+- Various CI tweaks.
+
+### Removed
+
+- The `Publish to PyPI` workflow. Python wrapper support is being discontinued, so the wrapper under `python/` is no longer published to PyPI on tag pushes.
 
 ### Fixed
 

@@ -6,17 +6,27 @@ on:
     tags: ["*"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
 
 permissions:
-  contents: write
+  contents: read
 
 jobs:
   docs:
     name: Build Docs
     if: github.actor != 'dependabot[bot]'
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write # lets julia-actions/cache prune old caches it created
+      contents: write # push the built docs to gh-pages
+      statuses: write # Documenter reports preview build status on pull requests
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: julia-actions/setup-julia@v3
         with:

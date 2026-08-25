@@ -10,6 +10,7 @@ jobs:
   register:
     name: Register with Julia General Registry
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - name: Verify dispatch is from main
         if: github.ref != 'refs/heads/main'
@@ -19,7 +20,7 @@ jobs:
           echo "::error::Releases must be dispatched from main, but this run is on '$REF'."
           exit 1
 
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Comment @JuliaRegistrator register
         env:
