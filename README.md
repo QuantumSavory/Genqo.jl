@@ -35,7 +35,7 @@ Pkg.add("Genqo")
 
 ## Quickstart
 
-Try running the [tutorial notebook](docs/tutorial/hybrid_model_jl.ipynb) for an introduction to Genqo.jl's structure and functionality.
+Try running the [ZALM tutorial notebook](docs/tutorial/zalm2.jl) for an introduction to Genqo.jl's structure and functionality.
 
 ## Contact
 
