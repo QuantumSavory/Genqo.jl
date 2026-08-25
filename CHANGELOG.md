@@ -20,6 +20,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Modify the A matrix function to directly compute only the upper left 2Nx2N block of A⁻¹, rather than computing the entire 4Nx4N A matrix and inverting, in cases where C polynomials only contain monomials in α and β*. This results in a speedup of 2.9-3.4x on the A matrix function for N=8,12,16.
 - Renamed justfile commands: `just test`/`just bench` now run the Julia test suite and the Julia benchmark suite; the Python comparison workflows moved to `just test-py`/`just bench-py` (the Julia half of the comparison benchmarks now lives in `test/python/bench.jl`).
 - The Python comparison tests moved out of the routine CI workflow into `.github/workflows/python-comparison.yml`, which runs only when legacy/Python-reference code changes or on manual dispatch.
+- The `Release` workflow now refuses to run unless it is dispatched from `main`, so a `@JuliaRegistrator register` comment cannot be posted against a feature-branch commit.
 
 ### Fixed
 
@@ -27,6 +28,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `project` with `Vector{Int}` detector outcomes threw a `MethodError`: `nmodes` shadowed `Gabs.nmodes` instead of extending it.
 - `fidelity` was ambiguous when both `Genqo` and `Gabs` were loaded; Genqo now extends the shared `QuantumInterface.fidelity` binding re-exported by Gabs/QuantumOpticsBase.
 - `tr(::ProjectedPureGaussianState)` asserted an exactly-zero imaginary part, which failed spuriously (imaginary residues ~1e-36) for circuit-built states; the assertion is now a relative tolerance.
+- Issue where the `Release` workflow mangled release notes that included text in backticks.
 
 ## [1.2.0] - 2026-04-30
 
