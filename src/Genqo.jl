@@ -1,7 +1,10 @@
 module Genqo
 
+using DocStringExtensions
+
 # Genqo v2 generalized framework
 include("wick.jl")
+include("lazy.jl")
 include("unitaries.jl")
 include("projectors.jl")
 

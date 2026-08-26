@@ -1,5 +1,6 @@
 module tmsv
 
+using DocStringExtensions
 using Nemo
 using LinearAlgebra
 
@@ -8,7 +9,7 @@ using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """
-    TMSV
+$(TYPEDEF)
 
 Parameters for a Two-Mode Squeezed Vacuum (TMSV) entanglement source.
 
@@ -16,11 +17,12 @@ The TMSV is the simplest Gaussian entangled state. Both modes are produced by a
 single parametric interaction, and the entanglement is characterized by the mean photon number μ.
 
 # Fields
-- `mean_photon::Real`         : Mean photon number per mode (default `1e-2`)
-- `detection_efficiency::Real`: Detector efficiency, ∈ [0, 1] (default `1.0`)
+$(TYPEDFIELDS)
 """
 Base.@kwdef mutable struct TMSV
+    "Mean photon number per mode (default `1e-2`)"
     mean_photon::Real = 1e-2
+    "Detector efficiency, ∈ [0, 1] (default `1.0`)"
     detection_efficiency::Real = 1.0
 end
 
@@ -42,7 +44,7 @@ R, generators = polynomial_ring(CC, all_qps)
 β = (qbi - i .* pbi) / sqrt(2)
 
 """
-    covariance_matrix(μ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the covariance matrix for a TMSV state.
 
@@ -61,7 +63,7 @@ covariance_matrix(μ::Real)::Matrix{Float64} = [
 covariance_matrix(tmsv::TMSV) = covariance_matrix(tmsv.mean_photon)
 
 """
-    loss_matrix_pgen(ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the loss contribution to the A-matrix for TMSV probability-of-success calculations.
 
@@ -86,7 +88,7 @@ end
 loss_matrix_pgen(tmsv::TMSV) = loss_matrix_pgen(tmsv.detection_efficiency)
 
 """
-    moment_vector(n::Int)
+$(TYPEDSIGNATURES)
 
 Construct the symbolic moment polynomial for order `n` of the TMSV coincidence measurement.
 
@@ -104,7 +106,7 @@ function moment_vector(n::Int)::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}
 end
 
 """
-    probability_success(μ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the probability of photon-photon state generation with the given parameters.
 

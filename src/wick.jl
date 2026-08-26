@@ -6,6 +6,8 @@ export wick_out, W, WTerms, extract_W_terms
 
 
 """
+$(TYPEDSIGNATURES)
+
 Precompute Wick partitions (perfect pairings) of 1:N.
 Stored as a (N-1)!! × 2 × (N/2) array of Int8, where each row is a perfect matching of the indices 1:N.
 """
@@ -53,7 +55,7 @@ wick_partitions(N::Int)::Array{Int8,3} = wick_partitions(Int8(N)) # dispatch to 
 
 
 """
-    WBucket{N}
+$(TYPEDEF)
 
 A homogeneous group of monomials that all have the same degree `N`. Stored as struct-of-arrays for
 cache locality, with indices as `NTuple{N,Int}` so the inner Wick loop reads them from registers.
@@ -69,7 +71,7 @@ Base.:*(a::C, b::WBucket{N}) where {C<:Number,N} = WBucket{N}(a * b.coeffs, b.in
 Base.:*(a::WBucket{N}, b::C) where {C<:Number,N} = WBucket{N}(b * a.coeffs, a.indices)
 
 """
-    WTerms{Buckets<:Tuple}
+$(TYPEDEF)
 
 A precompiled moment polynomial as a heterogeneous tuple of `WBucket`s, one per degree present in
 the polynomial. The tuple type carries each bucket's `N` at compile time so iteration unrolls and
@@ -90,18 +92,9 @@ Base.:*(a::C, b::WTerms) where {C<:Number} = WTerms(b.buckets .* a, b.mds)
 Base.:*(a::WTerms, b::C) where {C<:Number} = WTerms(a.buckets .* b, a.mds)
 
 """
-    extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})
+$(TYPEDSIGNATURES)
 
 Precompile a Nemo polynomial into a `WTerms` object suitable for the fast `W(::WTerms, Ainv)` path.
-
-Assumption (matched to current usage): moment polynomials are multilinear in the variables used for
-Wick evaluation (exponents are 0/1 for the variables of interest).
-
-# Parameters
-- C : Nemo multivariate polynomial over `ComplexField`
-
-# Returns
-A `WTerms{<:Tuple}` whose buckets cover every degree present in `C`.
 """
 function extract_W_terms(C::Nemo.Generic.MPoly{Nemo.ComplexFieldElem})::WTerms
     n_vars = nvars(parent(C))
@@ -138,12 +131,9 @@ end
 end
 
 """
-    W(t::WTerms, Ainv::Matrix{ComplexF64})
+$(TYPEDSIGNATURES)
 
 Fast Wick evaluator for precompiled moment terms.
-
-# Returns
-Complex value of the contracted moment.
 """
 function W(t::WTerms, Ainv::Matrix{ComplexF64})
     2*t.mds == size(Ainv, 1) == size(Ainv, 2) || throw(DimensionMismatch("Ainv must be a square matrix of size $(2*t.mds)×$(2*t.mds) to contract against a $(t.mds)-mode polynomial, got $(size(Ainv, 1))×$(size(Ainv, 2))"))

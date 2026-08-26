@@ -1,5 +1,6 @@
 module spdc
 
+using DocStringExtensions
 using BlockDiagonals
 using Nemo
 using LinearAlgebra
@@ -10,7 +11,7 @@ using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """
-    SPDC
+$(TYPEDEF)
 
 Parameters for a Spontaneous Parametric Down-Conversion (SPDC) entanglement source.
 
@@ -18,15 +19,16 @@ An SPDC source is composed of two Two-Mode Squeezed Vacuum (TMSV) states whose i
 
 
 # Fields
-- `mean_photon::Real`           : Mean photon number per mode (default `1e-2`)
-- `detection_efficiency::Real`  : Detector efficiency, ∈ [0, 1] (default `1.0`)
-- `bsm_efficiency::Real`        : Bell-state measurement efficiency, ∈ [0, 1] (default `1.0`)
-- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
+$(TYPEDFIELDS)
 """
 Base.@kwdef mutable struct SPDC
+    "Mean photon number per mode (default `1e-2`)"
     mean_photon::Real = 1e-2
+    "Detector efficiency, ∈ [0, 1] (default `1.0`)"
     detection_efficiency::Real = 1.0
+    "Bell-state measurement efficiency, ∈ [0, 1] (default `1.0`)"
     bsm_efficiency::Real = 1.0
+    "Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)"
     outcoupling_efficiency::Real = 1.0
 end
 
@@ -50,7 +52,7 @@ R, generators = polynomial_ring(CC, all_qps)
 _perm_matrix_12785634 = permutation_matrix([1,2,7,8,5,6,3,4])
 
 """
-    covariance_matrix(μ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 8×8 covariance matrix for an SPDC source.
 
@@ -69,7 +71,7 @@ end
 covariance_matrix(spdc::SPDC) = covariance_matrix(spdc.mean_photon)
 
 """
-    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 16×16 loss matrix for SPDC fidelity calculations.
 
@@ -115,7 +117,7 @@ loss_bsm_matrix_trace::Matrix{ComplexF64} = begin
 end
 
 """
-    dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate a single element of the unnormalized spin-spin density matrix for the SPDC source.
 
@@ -198,7 +200,7 @@ function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, 
 end
 
 """
-    spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})
+$(TYPEDSIGNATURES)
 
 Calculate the 4×4 spin-spin density matrix for the SPDC source conditioned on photon-number measurement outcome `nvec` after simulated mode-memory interaction.
 
@@ -277,7 +279,7 @@ method, with no runtime dispatch.
 const moment_terms = map(extract_W_terms, moment_vector)
 
 """
-    fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the Bell-state fidelity of the single-mode SPDC source under loss.
 

@@ -1,5 +1,6 @@
 module sigsag
 
+using DocStringExtensions
 using LinearAlgebra
 using BlockDiagonals
 using Nemo
@@ -10,22 +11,23 @@ using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """
-    SIGSAG
+$(TYPEDEF)
 
 Parameters for the heralded entanglement source architecture proposed by Chahine et al.
 
 The SIGSAG source is a heralded dual-rail entanglement source architecture proposed by Yousef Chahine et al. as an alternative to the cascaded source architecture. It can be realized with a single Sagnac configured entanglement source, hence the nomenclature of "SIGSAG" for short.
 
 # Fields
-- `mean_photon::Real`           : Mean photon number per mode (default `1e-2`)
-- `detection_efficiency::Real`  : Signal detector efficiency, ∈ [0, 1] (default `1.0`)
-- `bsm_efficiency::Real`        : BSM detector efficiency, ∈ [0, 1] (default `1.0`)
-- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
+$(TYPEDFIELDS)
 """
 Base.@kwdef mutable struct SIGSAG
+    "Mean photon number per mode (default `1e-2`)"
     mean_photon::Real = 1e-2
+    "Signal detector efficiency, ∈ [0, 1] (default `1.0`)"
     detection_efficiency::Real = 1.0
+    "BSM detector efficiency, ∈ [0, 1] (default `1.0`)"
     bsm_efficiency::Real = 1.0
+    "Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)"
     outcoupling_efficiency::Real = 1.0
 end
 
@@ -69,7 +71,7 @@ _S46 = begin
 end
 
 """
-    covariance_matrix(μ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 24×24 covariance matrix for a SIGSAG source.
 
@@ -94,7 +96,7 @@ end
 covariance_matrix(sigsag::SIGSAG) = covariance_matrix(sigsag.mean_photon)
 
 """
-    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 24×24 loss matrix for SIGSAG fidelity calculations.
 
@@ -124,7 +126,7 @@ end
 loss_bsm_matrix_fid(sigsag::SIGSAG) = loss_bsm_matrix_fid(sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
 """
-    loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 24×24 loss matrix for SIGSAG probability-of-success calculations.
 
@@ -160,7 +162,7 @@ end
 loss_bsm_matrix_pgen(sigsag::SIGSAG) = loss_bsm_matrix_pgen(sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
 """
-    _moment_vector_sym(n1::Vector{Int}, n2::Vector{Int})
+$(TYPEDSIGNATURES)
 
 Construct the *purely symbolic* moment polynomial for a SIGSAG coincidence measurement.
 
@@ -219,7 +221,7 @@ const moment_terms = map(extract_W_terms, moment_vector)
 
 
 """
-    probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the probability of photon-photon state generation for the SIGSAG source.
 
@@ -249,7 +251,7 @@ end
 probability_success(sigsag::SIGSAG) = probability_success(sigsag.mean_photon, sigsag.outcoupling_efficiency, sigsag.detection_efficiency)
 
 """
-    fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the Bell-state fidelity of the SIGSAG source under loss.
 

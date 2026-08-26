@@ -51,16 +51,28 @@ const ENGINE8 = HybridProjectionEngine(8)
 const ψ⁺ = (clicks([1, 0, 0, 1]) + clicks([0, 1, 1, 0])) / √2
 const ψ⁺ᵈ = ψ⁺'
 
-let ps = project(zalm_state(μ), ZALM_Π; η = ZALM_η) # warm the C-polynomial cache
+const ENGINE12 = HybridProjectionEngine(12) # emissive loading needs 2 extra modes per memory
+const DK_d = [1, 0, 1, 0]
+
+let ps = project(zalm_state(μ), ZALM_Π; η = ZALM_η) # warm the C-polynomial caches
     tr(ps; engine = ENGINE8)
     dot(ψ⁺ᵈ, ps, ψ⁺; engine = ENGINE8)
+    Matrix(duankimble(ps, DK_d; engine = ENGINE8).data)
+    Matrix(emissiveload(ps; engine = ENGINE12).data)
 end
 
 SUITE["project.zalm_state"] = @benchmarkable zalm_state($μ)
 SUITE["project.tr"] = @benchmarkable tr(ps; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
 SUITE["project.dot_bell"] = @benchmarkable dot(ψ⁺ᵈ, ps, ψ⁺; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
 SUITE["project.to_fock"] = @benchmarkable to_fock(ps; engine = ENGINE8, cutoff = 1) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
-SUITE["project.duankimble"] = @benchmarkable duankimble(ps, $[1, 0, 1, 0]; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+# Memory loading returns a lazily-evaluated density matrix, so the access pattern is what costs:
+# `tr` needs the M diagonal entries, materializing needs all M². Both are benchmarked so a
+# regression in either the deferred path or the bulk path shows up.
+SUITE["project.duankimble.construct"] = @benchmarkable duankimble(ps, DK_d; engine = ENGINE8) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.duankimble.tr"] = @benchmarkable tr(duankimble(ps, DK_d; engine = ENGINE8)) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.duankimble.materialize"] = @benchmarkable Matrix(duankimble(ps, DK_d; engine = ENGINE8).data) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.emissiveload.tr"] = @benchmarkable tr(emissiveload(ps; engine = ENGINE12)) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
+SUITE["project.emissiveload.materialize"] = @benchmarkable Matrix(emissiveload(ps; engine = ENGINE12).data) setup = (ps = project(zalm_state($μ), ZALM_Π; η = ZALM_η))
 
 
 

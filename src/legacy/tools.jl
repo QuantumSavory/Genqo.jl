@@ -1,5 +1,6 @@
 module tools
 
+using DocStringExtensions
 using LinearAlgebra
 using Nemo
 using BlockDiagonals
@@ -8,7 +9,7 @@ export permutation_matrix, reorder, k_function_matrix
 
 
 """
-    permutation_matrix(permutations::Vector{Int})
+$(TYPEDSIGNATURES)
 
 Construct a permutation matrix from a permutation vector.
 
@@ -31,7 +32,7 @@ function permutation_matrix(permutations::Vector{Int})::Matrix{Int}
 end
 
 """
-    reorder(covariance_matrix)
+$(TYPEDSIGNATURES)
 
 Reorder a covariance matrix from qpqp to qqpp mode ordering.
 
@@ -51,7 +52,7 @@ function reorder(covariance_matrix::Matrix{Float64})::Matrix{Float64}
 end
 
 """
-    k_function_matrix(covariance_matrix::Matrix{Float64})
+$(TYPEDSIGNATURES)
 
 Construct the complex-valued K-matrix used to form the Gaussian contraction matrix `A`.
 
