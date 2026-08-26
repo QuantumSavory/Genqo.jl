@@ -4,7 +4,9 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## What this is
 
-Genqo.jl models quantum entanglement sources (SPDC, ZALM, etc.) using a hybrid Gaussian/non-Gaussian framework that avoids low-mean-photon-number truncation. It is a Julia rewrite of an earlier Python package (kept as a reference implementation in `test/genqo_old_pkg/`), with performance as a primary design goal (~100-1000x over the Python original). A Python wrapper via juliacall lives in `python/`.
+Genqo.jl models hybrid Gaussian / non-Gaussian CV quantum optics. It is useful for problems such as modeling entangled photon sources, general GBS-based multimode state preparation, and photonic quantum computing.
+
+Genqo provides an interface for working with non-Gaussian projections of Gaussian states in a computationally efficient manner. When a Gaussian state is projected onto a specific measurement outcome, an intermediate object is created that looks and feels like a density matrix. Methods on this intermediate type implement a closed form involving a matrix Hafnian, which is handed off to [TheEggman.jl](https://github.com/QuantumSavory/TheEggman.jl) for fast evaluation. This approach sidesteps any computations involving truncated infinite-dimensional density operators, which are slow, memory-intensive, and inexact. 
 
 Requires Julia 1.12. The repo uses Julia workspaces: the root `Project.toml` declares `test/`, `docs/`, and `benchmark/` as workspace projects.
 
@@ -53,6 +55,6 @@ Hot paths avoid heap allocation and dynamic dispatch: degree-typed `NTuple` indi
 ## Conventions
 
 - Docs are built with `checkdocs = :exports` — every exported symbol needs a docstring or the docs build fails. New modules must be added to `modules` in `docs/make.jl`.
-- `CHANGELOG.md` follows Keep a Changelog; record notable changes under `[Unreleased]`.
+- `CHANGELOG.md` follows Keep a Changelog; concisely record notable changes under `[Unreleased]`. If a particular change only affects a part of the code that has not yet made it to a versioned release, don't bother including it — the changelog is only for recording changes to released code.
 - Version lives in `Project.toml` and `python/pyproject.toml`, kept in sync by bump-my-version (`just bump`).
 - Tutorials in `docs/tutorial/` are plain Julia scripts and notebooks used as working examples during development.
