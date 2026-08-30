@@ -621,21 +621,50 @@ function _invA(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int}):
     y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
     Y = Diagonal(y)
 
-    # Compute A matrix from blocks (block ordering: [α β* α* β])
-    A = zeros(ComplexF64, 4mds, 4mds)
+    # Compute A⁻¹ from block matrix inversion formula
+    # A⁻¹ = [
+    #   -GC̃          GC̃YC̃*      G      -GC̃Y
+    #    G*C̃*YC̃     -G*C̃*      -G*C̃*Y   G*
+    #    I+YG*C̃*YC̃  -YG*C̃*     -YG*C̃*Y  YG*
+    #   -YGC̃         I+YGC̃YC̃*   YG     -YGC̃Y
+    # ]
+    invG = I - C̃*Y*conj(C̃)*Y
+    G = inv(invG)
+    invA = Matrix{ComplexF64}(undef, 4mds, 4mds)
 
-    copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
-    copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
-    copyto!(view(A, 1:mds,       2mds+1:3mds), I)
-    copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
-    copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
-    copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
-    copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
-    conj!(C̃)
-    copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
+    # Upper-left block
+    invA[1:mds, 1:mds] = -G*C̃
+    @views copyto!(invA[mds+1:2mds, mds+1:2mds], invA[1:mds, 1:mds])
+    @views conj!(invA[mds+1:2mds, mds+1:2mds])
+    invA[1:mds, mds+1:2mds] =  G*C̃*Y*conj(C̃)
+    @views copyto!(invA[mds+1:2mds, 1:mds], invA[1:mds, mds+1:2mds])
+    @views conj!(invA[1:mds, mds+1:2mds])
 
-    invA = inv(A)
-    detA = det(A)
+    # Upper-right block
+    invA[1:mds, 2mds+1:3mds] = G
+    @views copyto!(invA[mds+1:2mds, 3mds+1:4mds], invA[1:mds, 2mds+1:3mds])
+    @views conj!(invA[mds+1:2mds, 3mds+1:4mds])
+    invA[1:mds, 3mds+1:4mds] = -G*C̃*Y
+    @views copyto!(invA[mds+1:2mds, 2mds+1:3mds], invA[1:mds, 3mds+1:4mds])
+    @views conj!(invA[mds+1:2mds, 2mds+1:3mds])
+
+    # Lower-left block
+    invA[3mds+1:4mds, mds+1:2mds] = I + Y*G*C̃*Y*conj(C̃)
+    @views copyto!(invA[2mds+1:3mds, 1:mds], invA[3mds+1:4mds, mds+1:2mds])
+    @views conj!(invA[2mds+1:3mds, 1:mds])
+    invA[3mds+1:4mds, 1:mds] = -Y*G*C̃
+    @views copyto!(invA[2mds+1:3mds, mds+1:2mds], invA[3mds+1:4mds, 1:mds])
+    @views conj!(invA[2mds+1:3mds, mds+1:2mds])
+
+    # Lower-right block
+    invA[3mds+1:4mds, 3mds+1:4mds] = -Y*G*C̃*Y
+    @views copyto!(invA[2mds+1:3mds, 2mds+1:3mds], invA[3mds+1:4mds, 3mds+1:4mds])
+    @views conj!(invA[2mds+1:3mds, 2mds+1:3mds])
+    invA[2mds+1:3mds, 3mds+1:4mds] = Y*G
+    @views copyto!(invA[3mds+1:4mds, 2mds+1:3mds], invA[2mds+1:3mds, 3mds+1:4mds])
+    @views conj!(invA[3mds+1:4mds, 2mds+1:3mds])
+
+    detA = det(invG)
 
     denom = sqrt(real(detA) * abs(det(Γ)))
     (invA, denom)
@@ -663,42 +692,23 @@ function _invA_UL(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int
     y = ones(ComplexF64, mds)
     y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
     Y = Diagonal(y)
-    try
-        # Compute upper-left block of A⁻¹ from block matrix inversion formula
-        invC̃ = inv(C̃)
-        invP = Y*conj(C̃)*Y - invC̃
-        P = inv(invP)
-        nPYC̃ = -P*Y*conj(C̃)
-        invA_UL = Matrix{ComplexF64}(undef, 2mds, 2mds)
-        copyto!(view(invA_UL, 1:mds,      1:mds     ), P)
-        copyto!(view(invA_UL, 1:mds,      mds+1:2mds), nPYC̃) # -PYC̃*
-        conj!(nPYC̃)
-        copyto!(view(invA_UL, mds+1:2mds, 1:mds     ), nPYC̃) # -P*YC̃
-        conj!(P)
-        copyto!(view(invA_UL, mds+1:2mds, mds+1:2mds), P) # P*
-        detA = det(C̃) * det(invP)
-    catch e
-        if e isa LinearAlgebra.SingularException
-            # Fallback to using the full inverse of A if the block inversion fails due to singularity of C̃
-            # Compute A matrix from blocks (block ordering: [α β* α* β])
-            A = zeros(ComplexF64, 4mds, 4mds)
 
-            copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
-            copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
-            copyto!(view(A, 1:mds,       2mds+1:3mds), I)
-            copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
-            copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
-            copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
-            copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
-            conj!(C̃)
-            copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
+    # Compute upper-left block of A⁻¹ from block matrix inversion formula
+    # A⁻¹_UL = [
+    #   -GC̃     GC̃YC̃*
+    #   G*C̃*YC̃  -G*C̃*
+    # ]
+    invG = I - C̃*Y*conj(C̃)*Y
+    G = inv(invG)
+    invA_UL = Matrix{ComplexF64}(undef, 2mds, 2mds)
+    invA_UL[1:mds, 1:mds] = -G*C̃
+    @views copyto!(invA_UL[mds+1:2mds, mds+1:2mds], invA_UL[1:mds, 1:mds])
+    @views conj!(invA_UL[mds+1:2mds, mds+1:2mds])
+    invA_UL[1:mds, mds+1:2mds] = G*C̃*Y*conj(C̃)
+    @views copyto!(invA_UL[mds+1:2mds, 1:mds], invA_UL[1:mds, mds+1:2mds])
+    @views conj!(invA_UL[1:mds, mds+1:2mds])
 
-            invA_UL = inv(A)[1:2mds, 1:2mds] # Extract upper-left block of A⁻¹
-            detA = det(A)
-        else
-            rethrow(e)
-        end
-    end
+    detA = det(invG)
 
     denom = sqrt(real(detA) * abs(det(Γ)))
     (invA_UL, denom)

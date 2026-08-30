@@ -142,3 +142,55 @@ end
     # Truncated trace is bounded by (and for small μ close to) the full trace
     @test real(sum(diag(dm.data))) <= tr(ps; engine) + 1e-12
 end
+
+@testitem "block inversion of A" begin
+    using Genqo: _invA, _invA_UL
+    using Gabs
+    using LinearAlgebra: I, Diagonal
+
+    mds = 6
+    engine = HybridProjectionEngine(mds)
+    st = eprstate(QuadBlockBasis(4), asinh(√1e-1), 0.) ⊗ vacuumstate(QuadBlockBasis(2))
+    apply!(st, [2,4], modeswap(QuadBlockBasis(2)))
+    apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
+
+    σ = st.covar / st.ħ
+    η = [0.7,0.7,0.05,0.05,0.05,0.05]
+    n = [1,1,-1,-1,-1,-1]
+
+    invA, _ = _invA(σ, η, n)
+    invA_UL, _ = _invA_UL(σ, η, n)
+
+    @test invA[1:2mds, 1:2mds] ≈ invA_UL
+
+    Γ = σ + 0.5*I
+    Γinv = inv(Γ)
+
+    # Views of Γinv blocks
+    a  = @view Γinv[1:mds,      1:mds     ]
+    c  = @view Γinv[1:mds,      mds+1:2mds]
+
+    cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
+    b  = @view Γinv[mds+1:2mds, mds+1:2mds]
+
+    @assert 0.5 * (a + b - im*(c - cᵀ)) ≈ I # Ã purity check
+
+    C̃ = 0.5 * (a - b + im*(c + cᵀ))
+    y = ones(ComplexF64, mds)
+    y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
+    Y = Diagonal(y)
+
+    A = zeros(ComplexF64, 4mds, 4mds)
+
+    copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
+    copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
+    copyto!(view(A, 1:mds,       2mds+1:3mds), I)
+    copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
+    copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
+    copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
+    copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
+    conj!(C̃)
+    copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
+
+    @test A * invA ≈ I
+end
