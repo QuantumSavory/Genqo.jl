@@ -2,6 +2,7 @@
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
 Gabs = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
 Genqo = "75f83073-4d85-4669-9473-9dff7d7e5b78"
+TheEggman = "d2b1023c-e65d-4dc8-8fde-b4ef6c929f77"
 
 [compat]
 BenchmarkTools = "1.6.3"

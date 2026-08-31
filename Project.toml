@@ -14,6 +14,7 @@ LazyArrays = "5078a376-72f3-5289-bfd5-ec5146d43c02"
 LinearAlgebra = "37e2e46d-f89d-539d-b4ee-838fcccc9c8e"
 Nemo = "2edaba10-b0f1-5616-af89-8c11ac63239a"
 QuantumOpticsBase = "4f57444f-1401-5e15-980d-4471b28d5678"
+TheEggman = "d2b1023c-e65d-4dc8-8fde-b4ef6c929f77"
 
 [compat]
 BlockDiagonals = "0.2.0"
@@ -23,4 +24,5 @@ LazyArrays = "2.12.0"
 LinearAlgebra = "1.12.0"
 Nemo = "0.56.1"
 QuantumOpticsBase = "0.5.10"
+TheEggman = "0.1.0"
 julia = "1.12"
