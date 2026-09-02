@@ -141,37 +141,7 @@ function plot_zalm2_Bell_state_fraction()
     PBell = zalm2_PBell.(μ, 1., 0.9)
 
     B = PBell ./ Pload
-<<<<<<< HEAD
-    
     plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", title="ZALM: Bell-state fraction", legend=:bottomright, dpi=300, color=1)
-=======
-    function zalm_bell_faction(μ::Real, ηT::Real, ηR::Real)::Real
-        # ηT = eta_T = partial BSM efficiency (Shapiro) = bsm_efficiency * detection_efficiency (genqo)
-        # ηR = eta_R = propagation transmissivity (Shapiro) = outcoupling_efficiency (genqo)
-        
-        # Shapiro eq. (21)
-        Ns  = (ηT*μ + 1) / (μ + 1)
-        
-        # N'_S defined after eq. (21)
-        N′s = (ηR/Ns + (1 - ηR))^(-1)
-
-        #Shapiro eq. (22): pr(loadable)
-        Pr_loadable = 1 - 2*(N′s^2)*(1 - (ηR*N′s)/(2*Ns))^2 + (N′s^4)*(1 - (ηR*N′s)/Ns)^2
-
-        # Shapiro eq. (25): Pr(Bell) = Pr(ψ⁻) + Pr(ψ⁺) + Pr(ϕ⁺) + Pr(ϕ⁻)
-        # There are 3 "wrong" Bell states each with probability Pr_wrong,
-        Pr_Bell = 2*N′s^4 * (
-            2*(1 - N′s)^2
-            - (2*ηR*(3*N′s^3 - 5*N′s^2 + 2*N′s)) / Ns
-            + (ηR^2*(4*N′s^4 - 6*N′s^3 + 2*N′s^2)) / Ns^2
-        ) + (ηR^2 * N′s^8) / (2*Ns^2)
-        
-        return Pr_Bell / Pr_loadable
-    end
-    plot(μ, zalm_bell_faction.(μ, 0.9, 0.01), label="ZALM - shapiro et al.", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", legend=:bottomright,color=1)
-    plot!(μ, B, label="ZALM", color=2, linestyle=:dash)
-
->>>>>>> 1bdef5a (sources comparison)
 end
 @time plot_zalm2_Bell_state_fraction()
 
@@ -264,7 +234,6 @@ function plot_zalm2_distillable_entanglement_rate()
 end
 @time plot_zalm2_distillable_entanglement_rate()
 
-<<<<<<< HEAD
 ## Spin-spin fidelity
 function plot_zalm2_spin_fidelity()
     μ = logrange(1e-4, 10, 100)
@@ -316,5 +285,3 @@ function zalm2_spin_density_matrix_emissive()
     display(ρ)
 end
 @time zalm2_spin_density_matrix_emissive()
-=======
->>>>>>> 1bdef5a (sources comparison)
