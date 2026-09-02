@@ -33,6 +33,72 @@ end
 @time plot_zalm2_probability()
 
 ## Bell-state fraction
+
+## Fidelity
+function plot_zalm2_fidelity()
+    engine = HybridProjectionEngine(8)
+    μ = logrange(1e-4, 10, 100)
+    η = 10 .^ -([0, 3, 6, 9]/10)
+    states = zalm2.(μ, 1., η'; engine=engine)
+    ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+    F = similar(states, Float64)
+    Threads.@threads for I in CartesianIndices(states)
+        F[I] = real(dot(ψ⁺', states[I], ψ⁺)) / tr(states[I])
+    end
+    F_ground = zalm.fidelity.(μ, 1., 1., η')
+
+    plot(μ, F_ground, label="Genqo v1 (ground truth)", ylim=[0,1], xscale=:log10, xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:topleft, color=[1 2 3 4])
+    plot!(μ, F, label="Genqo v2", linestyle=:dash, color=[1 2 3 4])
+end
+@time plot_zalm2_fidelity()
+function plot_zalm2_bell_fidelity()
+    engine = HybridProjectionEngine(8)
+    μ = logrange(1e-4, 1.5, 100)
+    
+    function zalm2_bell_fidelity(μ::Float64,ηT::Float64, ηR::Float64; engine::HybridProjectionEngine)
+        st = eprstate(QuadBlockBasis(8), asinh(√μ), 0.)
+        apply!(st, modeswap(QuadBlockBasis(4)), [2,4, 5,7])
+        apply!(st, beamsplitter(QuadBlockBasis(4), 0.5), [3,5, 4,6])
+
+        η = [ηR,ηR,ηT,ηT,ηT,ηT,ηR,ηR]
+        Π = projector([:,:,1,1,0,0,:,:])
+        st = project(st, Π; engine, η=η)
+
+        ψ⁺ = (clicks([1,0,0,1]) + clicks([0,1,1,0])) / √2
+        ψ⁻ = (clicks([1,0,0,1]) - clicks([0,1,1,0])) / √2
+        ϕ⁺ = (clicks([1,0,1,0]) + clicks([0,1,0,1])) / √2
+        ϕ⁻ = (clicks([1,0,1,0]) - clicks([0,1,0,1])) / √2
+
+       real(dot(ψ⁺', st, ψ⁺)) / real(dot(ψ⁺', st, ψ⁺) + dot(ψ⁻', st, ψ⁻) + dot(ϕ⁺', st, ϕ⁺) + dot(ϕ⁻', st, ϕ⁻))
+    end
+
+    function zalm_bell_fidelity(μ::Real, ηT::Real, ηR::Real)::Real
+
+        Ns  = (ηT*μ + 1) / (μ + 1)
+        
+        N′s = (ηR/Ns + (1 - ηR))^(-1)
+        
+        Pr_psi_minus = (N′s^4 / 2) * (
+            2*(1 - N′s)^2
+            - (2*ηR*(3*N′s^3 - 5*N′s^2 + 2*N′s)) / Ns
+            + (ηR^2*(5*N′s^4 - 6*N′s^3 + 2*N′s^2)) / Ns^2  
+        )
+        Pr_Bell = 2*N′s^4 * (
+            2*(1 - N′s)^2
+            - (2*ηR*(3*N′s^3 - 5*N′s^2 + 2*N′s)) / Ns
+            + (ηR^2*(4*N′s^4 - 6*N′s^3 + 2*N′s^2)) / Ns^2
+        ) + (ηR^2 * N′s^8) / (2*Ns^2)
+
+        return Pr_psi_minus / Pr_Bell
+    end
+
+    F = zalm2_bell_fidelity.(μ, 0.9, 0.01; engine=engine)
+    F_numerical = zalm_bell_fidelity.(μ, 0.9, 0.01)
+    plot(μ, F_numerical, label="numerical formula", xlabel="Mean Photon Number Per Mode", ylabel="Fidelity", legend=:bottomright,color=1)
+    plot!(μ, F, label="Genqo v2", color=2, linestyle=:dash)
+end
+@time plot_zalm2_bell_fidelity()
+
 function plot_zalm2_Bell_state_fraction()
     μ = logrange(1e-4, 1.5, 100)
 
@@ -73,9 +139,39 @@ function plot_zalm2_Bell_state_fraction()
 
     Pload = zalm2_Pload.(μ, 1., 0.9)
     PBell = zalm2_PBell.(μ, 1., 0.9)
+
     B = PBell ./ Pload
+<<<<<<< HEAD
     
     plot(μ, B, label="ZALM", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", title="ZALM: Bell-state fraction", legend=:bottomright, dpi=300, color=1)
+=======
+    function zalm_bell_faction(μ::Real, ηT::Real, ηR::Real)::Real
+        # ηT = eta_T = partial BSM efficiency (Shapiro) = bsm_efficiency * detection_efficiency (genqo)
+        # ηR = eta_R = propagation transmissivity (Shapiro) = outcoupling_efficiency (genqo)
+        
+        # Shapiro eq. (21)
+        Ns  = (ηT*μ + 1) / (μ + 1)
+        
+        # N'_S defined after eq. (21)
+        N′s = (ηR/Ns + (1 - ηR))^(-1)
+
+        #Shapiro eq. (22): pr(loadable)
+        Pr_loadable = 1 - 2*(N′s^2)*(1 - (ηR*N′s)/(2*Ns))^2 + (N′s^4)*(1 - (ηR*N′s)/Ns)^2
+
+        # Shapiro eq. (25): Pr(Bell) = Pr(ψ⁻) + Pr(ψ⁺) + Pr(ϕ⁺) + Pr(ϕ⁻)
+        # There are 3 "wrong" Bell states each with probability Pr_wrong,
+        Pr_Bell = 2*N′s^4 * (
+            2*(1 - N′s)^2
+            - (2*ηR*(3*N′s^3 - 5*N′s^2 + 2*N′s)) / Ns
+            + (ηR^2*(4*N′s^4 - 6*N′s^3 + 2*N′s^2)) / Ns^2
+        ) + (ηR^2 * N′s^8) / (2*Ns^2)
+        
+        return Pr_Bell / Pr_loadable
+    end
+    plot(μ, zalm_bell_faction.(μ, 0.9, 0.01), label="ZALM - shapiro et al.", xlabel="Mean Photon Number Per Mode", ylabel="Bell-state Fraction", legend=:bottomright,color=1)
+    plot!(μ, B, label="ZALM", color=2, linestyle=:dash)
+
+>>>>>>> 1bdef5a (sources comparison)
 end
 @time plot_zalm2_Bell_state_fraction()
 
@@ -168,6 +264,7 @@ function plot_zalm2_distillable_entanglement_rate()
 end
 @time plot_zalm2_distillable_entanglement_rate()
 
+<<<<<<< HEAD
 ## Spin-spin fidelity
 function plot_zalm2_spin_fidelity()
     μ = logrange(1e-4, 10, 100)
@@ -219,3 +316,5 @@ function zalm2_spin_density_matrix_emissive()
     display(ρ)
 end
 @time zalm2_spin_density_matrix_emissive()
+=======
+>>>>>>> 1bdef5a (sources comparison)

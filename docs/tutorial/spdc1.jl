@@ -59,3 +59,4 @@ function check_spdc1_spin_density_matrix()
     println("Equal? ", all(ρi.data ≈ ρi_ground for (ρi, ρi_ground) in zip(ρ, ρ_ground)) ? "✓" : "✗")
 end
 @time check_spdc1_spin_density_matrix()
+
