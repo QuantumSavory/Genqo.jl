@@ -146,51 +146,74 @@ end
 @testitem "block inversion of A" begin
     using Genqo: _invA, _invA_UL
     using Gabs
-    using LinearAlgebra: I, Diagonal
+    using LinearAlgebra: I, Diagonal, norm
+
+    # Rebuild A from σ the long way round, to give the closed forms in _invA /
+    # _invA_UL something independent to be checked against.
+    function A_matrix(σ, η, n)
+        mds = size(σ, 1) ÷ 2
+        Γinv = inv(σ + 0.5*I)
+
+        # Views of Γinv blocks
+        a  = @view Γinv[1:mds,      1:mds     ]
+        c  = @view Γinv[1:mds,      mds+1:2mds]
+
+        cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
+        b  = @view Γinv[mds+1:2mds, mds+1:2mds]
+
+        @assert 0.5 * (a + b - im*(c - cᵀ)) ≈ I # Ã purity check
+
+        C̃ = 0.5 * (a - b + im*(c + cᵀ))
+        y = ones(ComplexF64, mds)
+        y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
+        Y = Diagonal(y)
+
+        A = zeros(ComplexF64, 4mds, 4mds)
+
+        copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
+        copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
+        copyto!(view(A, 1:mds,       2mds+1:3mds), I)
+        copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
+        copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
+        copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
+        copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
+        conj!(C̃)
+        copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
+        A
+    end
 
     mds = 6
-    engine = HybridProjectionEngine(mds)
-    st = eprstate(QuadBlockBasis(4), asinh(√1e-1), 0.) ⊗ vacuumstate(QuadBlockBasis(2))
-    apply!(st, [2,4], modeswap(QuadBlockBasis(2)))
-    apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
-
-    σ = st.covar / st.ħ
     η = [0.7,0.7,0.05,0.05,0.05,0.05]
     n = [1,1,-1,-1,-1,-1]
 
-    invA, _ = _invA(σ, η, n)
-    invA_UL, _ = _invA_UL(σ, η, n)
+    function bsm_cov(phases)
+        st = eprstate(QuadBlockBasis(4), asinh(√1e-1), 0.) ⊗ vacuumstate(QuadBlockBasis(2))
+        apply!(st, [2,4], modeswap(QuadBlockBasis(2)))
+        apply!(st, [3,5, 4,6], beamsplitter(QuadBlockBasis(4), 0.5))
+        for (mode, φ) in phases
+            apply!(st, [mode], phaseshift(QuadBlockBasis(1), φ))
+        end
+        st.covar / st.ħ
+    end
 
-    @test invA[1:2mds, 1:2mds] ≈ invA_UL
+    # A real C̃ makes the whole of A⁻¹ real, and a C̃ carrying only a global phase
+    # has that phase cancel in GC̃YC̃*, so either one hides a mix-up between the
+    # conjugate-paired blocks of the closed form. Unequal phase shifts on separate
+    # modes leave those blocks genuinely complex, which pins them down.
+    phased = (1 => π/5, 3 => π/3)
+    for phases in ((), phased)
+        σ = bsm_cov(phases)
 
-    Γ = σ + 0.5*I
-    Γinv = inv(Γ)
+        invA, denom = _invA(σ, η, n)
+        invA_UL, denom_UL = _invA_UL(σ, η, n)
 
-    # Views of Γinv blocks
-    a  = @view Γinv[1:mds,      1:mds     ]
-    c  = @view Γinv[1:mds,      mds+1:2mds]
+        @test invA[1:2mds, 1:2mds] ≈ invA_UL
+        @test denom ≈ denom_UL
+        @test A_matrix(σ, η, n) * invA ≈ I
+    end
 
-    cᵀ = @view Γinv[mds+1:2mds, 1:mds     ]
-    b  = @view Γinv[mds+1:2mds, mds+1:2mds]
-
-    @assert 0.5 * (a + b - im*(c - cᵀ)) ≈ I # Ã purity check
-
-    C̃ = 0.5 * (a - b + im*(c + cᵀ))
-    y = ones(ComplexF64, mds)
-    y[n .!== -1] -= η[n .!== -1] # y_i = 1 - η_i for detected modes, y_i = 1 for transmitted modes
-    Y = Diagonal(y)
-
-    A = zeros(ComplexF64, 4mds, 4mds)
-
-    copyto!(view(A, 1:mds,       mds+1:2mds ), -Y)
-    copyto!(view(A, mds+1:2mds,  1:mds      ), -Y)
-    copyto!(view(A, 1:mds,       2mds+1:3mds), I)
-    copyto!(view(A, mds+1:2mds,  3mds+1:4mds), I)
-    copyto!(view(A, 2mds+1:3mds, 1:mds      ), I)
-    copyto!(view(A, 3mds+1:4mds, mds+1:2mds ), I)
-    copyto!(view(A, 2mds+1:3mds, 2mds+1:3mds), C̃) # C̃
-    conj!(C̃)
-    copyto!(view(A, 3mds+1:4mds, 3mds+1:4mds), C̃) # C̃*
-
-    @test A * invA ≈ I
+    # Guard the guard: if the phased covariance ever stops making the off-diagonal
+    # blocks complex, the case above silently goes back to proving nothing.
+    invA, _ = _invA(bsm_cov(phased), η, n)
+    @test norm(imag(invA[1:mds, mds+1:2mds])) > 1e-3
 end

@@ -638,7 +638,7 @@ function _invA(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int}):
     @views conj!(invA[mds+1:2mds, mds+1:2mds])
     invA[1:mds, mds+1:2mds] =  G*C̃*Y*conj(C̃)
     @views copyto!(invA[mds+1:2mds, 1:mds], invA[1:mds, mds+1:2mds])
-    @views conj!(invA[1:mds, mds+1:2mds])
+    @views conj!(invA[mds+1:2mds, 1:mds])
 
     # Upper-right block
     invA[1:mds, 2mds+1:3mds] = G
@@ -660,9 +660,9 @@ function _invA(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int}):
     invA[3mds+1:4mds, 3mds+1:4mds] = -Y*G*C̃*Y
     @views copyto!(invA[2mds+1:3mds, 2mds+1:3mds], invA[3mds+1:4mds, 3mds+1:4mds])
     @views conj!(invA[2mds+1:3mds, 2mds+1:3mds])
-    invA[2mds+1:3mds, 3mds+1:4mds] = Y*G
-    @views copyto!(invA[3mds+1:4mds, 2mds+1:3mds], invA[2mds+1:3mds, 3mds+1:4mds])
-    @views conj!(invA[3mds+1:4mds, 2mds+1:3mds])
+    invA[3mds+1:4mds, 2mds+1:3mds] = Y*G
+    @views copyto!(invA[2mds+1:3mds, 3mds+1:4mds], invA[3mds+1:4mds, 2mds+1:3mds])
+    @views conj!(invA[2mds+1:3mds, 3mds+1:4mds])
 
     detA = det(invG)
 
@@ -706,7 +706,7 @@ function _invA_UL(σ::Matrix{Float64}, η::Vector{Float64}, n::AbstractArray{Int
     @views conj!(invA_UL[mds+1:2mds, mds+1:2mds])
     invA_UL[1:mds, mds+1:2mds] = G*C̃*Y*conj(C̃)
     @views copyto!(invA_UL[mds+1:2mds, 1:mds], invA_UL[1:mds, mds+1:2mds])
-    @views conj!(invA_UL[1:mds, mds+1:2mds])
+    @views conj!(invA_UL[mds+1:2mds, 1:mds])
 
     detA = det(invG)
 
