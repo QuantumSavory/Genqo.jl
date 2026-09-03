@@ -1,4 +1,5 @@
 using Genqo
+using Genqo: _wick_partitions
 using BenchmarkTools
 
 # Get optional function filter and output directory from command line arguments
@@ -75,7 +76,7 @@ SUITE["sigsag.fidelity"]               = @benchmarkable sigsag.fidelity(s)      
 # once. The new algorithm (tools._wick_partitions) builds pairings recursively, only
 # emitting valid perfect matchings.
 function _wick_partitions_old(n::Int)
-    @assert iseven(n) "n must be even"
+    iseven(n) || throw(ArgumentError("n must be even"))
     all_partitions = Vector{Vector{Tuple{Int,Int}}}()
 
     # Mimic itertools.combinations(range(n), 2)
@@ -110,7 +111,7 @@ function _wick_partitions_old(n::Int)
 end
 
 for N in (2, 4, 6, 8)
-    SUITE["pmp.new.N=$N"] = @benchmarkable tools._wick_partitions($N)
+    SUITE["pmp.new.N=$N"] = @benchmarkable _wick_partitions($N)
     SUITE["pmp.old.N=$N"] = @benchmarkable _wick_partitions_old($N)
 end
 
@@ -125,20 +126,20 @@ SUITE["logsweep_1d"]                 = @benchmarkable tmsv.probability_success.(
 # If running this file directly, run benchmarks
 if abspath(PROGRAM_FILE) == @__FILE__
     # Filter suite based on func_filter if provided
+    suite = SUITE
     if !isempty(func_filter)
-        filtered_suite = BenchmarkGroup()
+        suite = BenchmarkGroup()
         for (name, benchmark) in SUITE
             if occursin(func_filter, name)
-                filtered_suite[name] = benchmark
+                suite[name] = benchmark
             end
         end
-        SUITE = filtered_suite
-        if isempty(SUITE)
+        if isempty(suite)
             @warn "No benchmarks matched filter: $func_filter"
         end
     end
 
-    results = run(SUITE)
+    results = run(suite)
     for (func, trial) in results
         println("$func:")
         display(trial)

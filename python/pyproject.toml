@@ -42,10 +42,10 @@ test = [
 ]
 
 [project.urls]
-#Homepage = "https://github.com/JacobGunnell/genqo.jl"
-#Documentation = "https://genqo.rtfd.io/en/stable/"
-Repository = "https://github.com/JacobGunnell/genqo.jl"
-Issues = "https://github.com/JacobGunnell/genqo.jl/issues"
+Homepage = "https://github.com/QuantumSavory/Genqo.jl"
+Documentation = "https://quantumsavory.github.io/Genqo.jl/"
+Repository = "https://github.com/QuantumSavory/Genqo.jl"
+Issues = "https://github.com/QuantumSavory/Genqo.jl/issues"
 
 [tool.setuptools]
 packages = ["genqo"]

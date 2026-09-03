@@ -1,33 +1,36 @@
 module zalm
 
+using DocStringExtensions
 using BlockDiagonals
 using Nemo
 using LinearAlgebra
 
 import ..spdc
 using ..tools
+using ..Genqo: wick_out, W, WTerms, extract_W_terms
 
 
 """
-    ZALM
+$(TYPEDEF)
 
 Parameters for a Zero-Added-Loss Multiplexing (ZALM) cascaded entanglement source.
 
 The ZALM architecture uses two SPDC sources, interfering half of the modes from each source on a pair of 50/50 beamsplitters to perform a Bell-state measurement (BSM). A heralding click pattern signifies a probabilistic photon-photon Bell state between the output modes. Dark counts and all three efficiency channels can be modeled.
 
 # Fields
-- `mean_photon::Real`           : Mean photon number per mode per SPDC source (default `1e-2`)
-- `detection_efficiency::Real`  : Signal detector efficiency, ∈ [0, 1] (default `1.0`)
-- `bsm_efficiency::Real`        : BSM detector efficiency, ∈ [0, 1] (default `1.0`)
-- `outcoupling_efficiency::Real`: Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)
-- `dark_counts::Real`           : Dark-count probability per BSM detector gate, ≥ 0 (default `0.0`)
+$(TYPEDFIELDS)
 """
 Base.@kwdef mutable struct ZALM
+    "Mean photon number per mode per SPDC source (default `1e-2`)"
     mean_photon::Real = 1e-2
     #schmidt_coeffs::Vector{Float64}
+    "Signal detector efficiency, ∈ [0, 1] (default `1.0`)"
     detection_efficiency::Real = 1.0
+    "BSM detector efficiency, ∈ [0, 1] (default `1.0`)"
     bsm_efficiency::Real = 1.0
+    "Photon outcoupling / transmission efficiency, ∈ [0, 1] (default `1.0`)"
     outcoupling_efficiency::Real = 1.0
+    "Dark-count probability per BSM detector gate, ≥ 0 (default `0.0`)"
     dark_counts::Real = 0.0
     #visibility::Real = 1.0
 end
@@ -72,7 +75,7 @@ _S46 = begin
 end
 
 """
-    covariance_matrix(μ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 32×32 pre-heralding covariance matrix for a ZALM source.
 
@@ -94,7 +97,7 @@ end
 covariance_matrix(zalm::ZALM) = covariance_matrix(zalm.mean_photon)
 
 """
-    loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 32×32 loss matrix for ZALM fidelity calculations.
 
@@ -125,7 +128,7 @@ end
 loss_bsm_matrix_fid(zalm::ZALM) = loss_bsm_matrix_fid(zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency)
 
 """
-    loss_bsm_matrix_pgen(ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+$(TYPEDSIGNATURES)
 
 Construct the 32×32 loss matrix for ZALM probability-of-success calculations.
 
@@ -162,7 +165,7 @@ end
 loss_bsm_matrix_pgen(zalm::ZALM) = loss_bsm_matrix_pgen(zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency)
 
 """
-    dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate a single element of the unnormalized spin-spin density matrix.
 
@@ -251,7 +254,7 @@ function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, 
 end
 
 """
-    spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, nvec::Vector{Int})
+$(TYPEDSIGNATURES)
 
 Calculate the density operator of the single-mode ZALM source on the spin-spin state.
 
@@ -349,7 +352,7 @@ method, with no runtime dispatch.
 const moment_terms = map(extract_W_terms, moment_vector)
 
 """
-    probability_success(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real, dark_counts::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the probability of photon-photon state generation with the given parameters.
 
@@ -385,7 +388,7 @@ end
 probability_success(zalm::ZALM) = probability_success(zalm.mean_photon, zalm.outcoupling_efficiency, zalm.detection_efficiency, zalm.bsm_efficiency, zalm.dark_counts)
 
 """
-    fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real, ηᵇ::Real)
+$(TYPEDSIGNATURES)
 
 Calculate the Bell-state fidelity of the single-mode ZALM source under loss.
 
