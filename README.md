@@ -19,9 +19,9 @@ Genqo provides an interface for working with non-Gaussian projections of Gaussia
 
 <div align="center">
 
-![Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after Ns = 0.2.](assets/images/genqo_vs_perturbative.svg)
+![Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after G-1 = 0.2.](assets/images/genqo_vs_perturbative.svg)
 
-*Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after Ns = 0.2.*
+*Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after G-1 = 0.2.*
 
 </div>
 
@@ -35,7 +35,7 @@ Pkg.add("Genqo")
 
 ## Quickstart
 
-Try running the [ZALM tutorial notebook](docs/tutorial/zalm2.jl) for an introduction to Genqo.jl's structure and functionality.
+Try running the [ZALM tutorial script](docs/tutorial/2_zalm.jl) for an introduction to Genqo.jl's structure and functionality.
 
 ## Contact
 
