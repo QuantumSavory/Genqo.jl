@@ -15,13 +15,13 @@
 
 Genqo.jl is a package for efficiently modeling hybrid Gaussian / non-Gaussian CV quantum optics. It is useful for problems such as modeling entangled photon sources, general GBS-based multimode state preparation, and photonic quantum computing.
 
-Genqo provides an interface for working with non-Gaussian projections of Gaussian states in a computationally efficient manner. When a Gaussian state is projected onto a specific measurement outcome, an intermediate object is created that looks and feels like a density matrix. Methods on this intermediate type implement a closed form involving a matrix Hafnian, which is handed off to [TheEggman.jl](https://github.com/QuantumSavory/TheEggman.jl) for fast evaluation. This approach sidesteps any computations involving truncated infinite-dimensional density operators, which are slow, memory-intensive, and inexact. 
+Genqo provides an interface for working with non-Gaussian projections of Gaussian states in a computationally efficient manner. When a Gaussian state is projected onto a Fock-basis projector encoding a specific measurement outcome, an intermediate object is created that looks and feels like a density matrix. Methods on this intermediate type implement a closed form involving a matrix Hafnian, which is handed off to [TheEggman.jl](https://github.com/QuantumSavory/TheEggman.jl) for fast evaluation. This approach sidesteps any computations involving truncated infinite-dimensional density operators, which are slow, memory-intensive, and inexact. 
 
 <div align="center">
 
-![Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after G-1 = 0.2.](assets/images/genqo_vs_perturbative.svg)
+![Comparison of the Genqo hybrid ZALM model to analytical Fock-basis models. After G-1 = 0.2, Genqo maintains the exact value, while other models rely on a low mean photon number approximation that breaks down.](assets/images/genqo_vs_perturbative.svg)
 
-*Comparison of the hybrid ZALM model to analytical models using the low mean photon number approximation. Divergence of hybrid model from truncated models is evident after G-1 = 0.2.*
+*Comparison of the Genqo hybrid ZALM model to analytical Fock-basis models. After G-1 = 0.2, Genqo maintains the exact value, while other models rely on a low mean photon number approximation that breaks down.*
 
 </div>
 
