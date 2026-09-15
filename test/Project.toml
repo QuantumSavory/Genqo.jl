@@ -1,5 +1,7 @@
 [deps]
 BenchmarkTools = "6e4b80f9-dd63-53aa-95a3-0cdb28fa8baf"
+BlockDiagonals = "0a1fb500-61f7-11e9-3c65-f5ef3456f9f0"
+DocStringExtensions = "ffbed154-4ef7-542d-bbb7-c09d3a79fcae"
 Gabs = "0eb812ee-a11f-4f5e-b8d4-bb8a44f06f50"
 Genqo = "75f83073-4d85-4669-9473-9dff7d7e5b78"
 JLD2 = "033835bb-8acc-5ee8-8aae-3f567f8a3819"
@@ -13,6 +15,8 @@ TestItemRunner = "f8b46487-2199-4994-9208-9a1283c18c0a"
 
 [compat]
 BenchmarkTools = "1.6.3"
+BlockDiagonals = "0.2.0"
+DocStringExtensions = "0.9.5"
 JLD2 = "0.5"
 StableRNGs = "1"
 Test = "1.11.0"

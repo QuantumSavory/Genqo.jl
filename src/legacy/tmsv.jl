@@ -1,11 +1,11 @@
 module tmsv
 
 using DocStringExtensions
-using Nemo
-using LinearAlgebra
+using LinearAlgebra: tr
+using Gabs: QuadBlockBasis, eprstate
 
-using ..tools
-using ..Genqo: wick_out, W, WTerms, extract_W_terms
+using ..tools: _unreorder
+using ..Genqo: project, projector
 
 
 """
@@ -26,22 +26,16 @@ Base.@kwdef mutable struct TMSV
     detection_efficiency::Real = 1.0
 end
 
-# Global canonical position and momentum variables
 const mds = 2 # Number of modes for our system
 
-_qai = ["qa$i" for i in 1:mds]
-_pai = ["pa$i" for i in 1:mds]
-_qbi = ["qb$i" for i in 1:mds]
-_pbi = ["pb$i" for i in 1:mds]
-all_qps = hcat(_qai, _pai, _qbi, _pbi)
-CC = ComplexField()
-i = onei(CC) # Imaginary unit in CC ring
-R, generators = polynomial_ring(CC, all_qps)
-(qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
+# The Gaussian circuit: a single EPR pair. The squeezing phase θ = π reproduces the legacy
+# sign convention for the qq correlation (+√(μ(μ+1))); Gabs works in ħ=2, the legacy
+# covariance matrices in ħ=1, hence the rescaling by `st.ħ` wherever the matrix is reported.
+_state(μ::Real) = eprstate(QuadBlockBasis(mds), asinh(√μ), Float64(π))
 
-# Define the alpha and beta vectors
-α = (qai + i .* pai) / sqrt(2)
-β = (qbi - i .* pbi) / sqrt(2)
+# Both modes are detected, so a success is a coincidence click across the pair.
+_projected_state(μ::Real, ηᵈ::Real) =
+    project(_state(μ), projector([1, 1]); η = fill(Float64(ηᵈ), mds))
 
 """
 $(TYPEDSIGNATURES)
@@ -52,63 +46,21 @@ Construct the covariance matrix for a TMSV state.
 - μ : The mean photon number of the TMSV state
 
 # Returns
-The covariance matrix for the TMSV state, in the qpqp ordering
+4×4 `Float64` covariance matrix for the TMSV state, in the qpqp ordering and the ħ=1 convention.
 """
-covariance_matrix(μ::Real)::Matrix{Float64} = [
-    0.5 + μ        0               sqrt(μ*(μ+1))  0;
-    0              0.5 + μ         0              -sqrt(μ*(μ+1));
-    sqrt(μ*(μ+1))  0               0.5 + μ        0;
-    0              -sqrt(μ*(μ+1))  0              0.5 + μ;
-]
+function covariance_matrix(μ::Real)::Matrix{Float64}
+    st = _state(μ)
+    _unreorder(st.covar ./ st.ħ)
+end
 covariance_matrix(tmsv::TMSV) = covariance_matrix(tmsv.mean_photon)
 
 """
 $(TYPEDSIGNATURES)
 
-Construct the loss contribution to the A-matrix for TMSV probability-of-success calculations.
-
-# Parameters
-- ηᵈ: Detection efficiency, ∈ [0, 1]
-
-# Returns
-8×8 `ComplexF64` loss matrix for use in `A = k_function_matrix(cov) + loss_matrix_pgen(ηᵈ)`.
-"""
-function loss_matrix_pgen(ηᵈ::Real)::Matrix{ComplexF64}
-    G = zeros(ComplexF64, 8, 8)
-
-    for i in 1:2
-        G[i,     i+2*mds] = ηᵈ - 1
-        G[i,     i+3*mds] = -im*(ηᵈ - 1)
-        G[i+mds, i+2*mds] = im*(ηᵈ - 1)
-        G[i+mds, i+3*mds] = ηᵈ - 1
-    end
-
-    return (G + transpose(G) + I) / 2
-end
-loss_matrix_pgen(tmsv::TMSV) = loss_matrix_pgen(tmsv.detection_efficiency)
-
-"""
-$(TYPEDSIGNATURES)
-
-Construct the symbolic moment polynomial for order `n` of the TMSV coincidence measurement.
-
-Returns the Nemo polynomial `(α₁α₂)ⁿ/n! · (β₁β₂)ⁿ/n!` in the global phase-space variables,
-representing the n-photon coincidence moment. Evaluated at `n=1` for `probability_success`.
-
-# Parameters
-- n: Photon number order
-
-# Returns
-Nemo multivariate polynomial over `ComplexField`.
-"""
-function moment_vector(n::Int)::Nemo.Generic.MPoly{Nemo.ComplexFieldElem}
-    (α[1]*α[2])^n / factorial(n) * (β[1]*β[2])^n / factorial(n)
-end
-
-"""
-$(TYPEDSIGNATURES)
-
 Calculate the probability of photon-photon state generation with the given parameters.
+
+Evaluated as the trace of the [`Genqo.project`](@ref)ion of the source state onto a coincidence
+click in both modes.
 
 # Parameters
 - μ : The mean photon number of the TMSV state
@@ -117,25 +69,7 @@ Calculate the probability of photon-photon state generation with the given param
 # Returns
 Probability of successful photon-photon state generation
 """
-function probability_success(μ::Real, ηᵈ::Real)::Real
-    # Compute covariance matrix and reorder qpqp → qqpp
-    cov = reorder(covariance_matrix(μ))
-
-    A = k_function_matrix(cov) + loss_matrix_pgen(ηᵈ)
-    Ainv = inv(A)
-    Γ = cov + (1/2)*I
-    detΓ = det(Γ)
-
-    N1 = ηᵈ^2
-    D1 = sqrt(det(A))
-    D2 = detΓ^(1/4)
-    D3 = conj(detΓ)^(1/4)
-    Coef = N1/(D1*D2*D3)
-
-    C = moment_vector(1)
-
-    return real(Coef * W(C, Ainv))
-end
+probability_success(μ::Real, ηᵈ::Real)::Real = tr(_projected_state(μ, ηᵈ))
 probability_success(tmsv::TMSV) = probability_success(tmsv.mean_photon, tmsv.detection_efficiency)
 
 end # module

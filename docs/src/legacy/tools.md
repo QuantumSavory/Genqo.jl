@@ -9,5 +9,4 @@ projection machinery that used to be documented here now lives under the
 ```@docs
 Genqo.tools.permutation_matrix
 Genqo.tools.reorder
-Genqo.tools.k_function_matrix
 ```

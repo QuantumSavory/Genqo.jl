@@ -141,9 +141,6 @@ class TMSV(GenqoBase):
     def covariance_matrix(self) -> np.ndarray:
         return np.asarray(_jl_call(jl.tmsv.covariance_matrix, self.mean_photon))
         
-    def loss_matrix_pgen(self) -> np.ndarray:
-        return np.asarray(_jl_call(jl.tmsv.loss_matrix_pgen, self.detection_efficiency))
-    
     def probability_success(self):
         return _jl_call(jl.tmsv.probability_success, self.mean_photon, self.detection_efficiency)
     
@@ -157,11 +154,6 @@ class SPDC(GenqoBase):
 
     def covariance_matrix(self) -> np.ndarray:
         return np.asarray(_jl_call(jl.spdc.covariance_matrix, self.mean_photon))
-    
-    def loss_bsm_matrix_fid(self) -> np.ndarray:
-        return np.asarray(_jl_call(
-            jl.spdc.loss_bsm_matrix_fid, self.outcoupling_efficiency, self.detection_efficiency
-        ))
     
     def spin_density_matrix(self, nvec: np.ndarray) -> np.ndarray:
         return np.asarray(_jl_call(
@@ -189,18 +181,6 @@ class ZALM(GenqoBase):
     def covariance_matrix(self) -> np.ndarray:
         return np.asarray(_jl_call(jl.zalm.covariance_matrix, self.mean_photon))
     
-    def loss_bsm_matrix_fid(self) -> np.ndarray:
-        return np.asarray(_jl_call(
-            jl.zalm.loss_bsm_matrix_fid,
-            self.outcoupling_efficiency, self.detection_efficiency, self.bsm_efficiency
-        ))
-
-    def loss_bsm_matrix_pgen(self) -> np.ndarray:
-        return np.asarray(_jl_call(
-            jl.zalm.loss_bsm_matrix_pgen,
-            self.outcoupling_efficiency, self.detection_efficiency, self.bsm_efficiency
-        ))
-
     def spin_density_matrix(self, nvec: np.ndarray) -> np.ndarray:
         return np.asarray(_jl_call(
             jl.zalm.spin_density_matrix,
@@ -224,14 +204,6 @@ class ZALM(GenqoBase):
         )
     
     
-def k_function_matrix(covariance_matrix: np.ndarray) -> np.ndarray:
-    return np.asarray(
-        jl.tools.k_function_matrix(
-            jl.convert(jl.Matrix[jl.Float64], covariance_matrix)
-        )
-    )
-
-
 @define
 class SIGSAG(GenqoBase):
     mean_photon: float | np.ndarray = field(default=1e-2, validator=_ge(0.0))
@@ -241,11 +213,6 @@ class SIGSAG(GenqoBase):
     
     def covariance_matrix(self) -> np.ndarray:
         return np.asarray(_jl_call(jl.sigsag.covariance_matrix, self.mean_photon))
-    
-    def loss_bsm_matrix_fid(self) -> np.ndarray:
-        return np.asarray(_jl_call(
-            jl.sigsag.loss_bsm_matrix_fid, self.outcoupling_efficiency, self.detection_efficiency
-        ))
     
     def probability_success(self):
         return _jl_call(

@@ -1,13 +1,11 @@
 module spdc
 
 using DocStringExtensions
-using BlockDiagonals
-using Nemo
-using LinearAlgebra
+using LinearAlgebra: dot
+using Gabs: QuadBlockBasis, eprstate, apply!
 
-import ..tmsv
-using ..tools
-using ..Genqo: wick_out, W, WTerms, extract_W_terms
+using ..tools: _unreorder
+using ..Genqo: modeswap, project, projector, clicks, duankimble
 
 
 """
@@ -32,177 +30,50 @@ Base.@kwdef mutable struct SPDC
     outcoupling_efficiency::Real = 1.0
 end
 
-# Global canonical position and momentum variables
 const mds = 4 # Number of modes for our system
 
-_qai = ["qa$i" for i in 1:mds]
-_pai = ["pa$i" for i in 1:mds]
-_qbi = ["qb$i" for i in 1:mds]
-_pbi = ["pb$i" for i in 1:mds]
-all_qps = hcat(_qai, _pai, _qbi, _pbi)
-CC = ComplexField()
-i = onei(CC) # Imaginary unit in CC ring
-R, generators = polynomial_ring(CC, all_qps)
-(qai, pai, qbi, pbi) = (generators[:,i] for i in 1:4)
+# The Gaussian circuit: two EPR pairs on modes (1,2) and (3,4), then a swap of modes 2 and 4
+# to give the SPDC polarization pairing (1,4)(2,3). The squeezing phase θ = π reproduces the
+# legacy sign convention for the qq correlation; Gabs works in ħ=2 and the legacy covariance
+# matrices in ħ=1, hence the rescaling by `st.ħ` wherever the matrix is reported.
+function _state(μ::Real)
+    st = eprstate(QuadBlockBasis(mds), asinh(√μ), Float64(π))
+    apply!(st, [2, 4], modeswap(QuadBlockBasis(2)))
+    st
+end
 
-# Define the alpha and beta vectors
-α = (qai + i .* pai) / sqrt(2)
-β = (qbi - i .* pbi) / sqrt(2)
+# The source is unheralded, so every mode is left free and the photon-photon state is read out
+# directly. A single transmission-detection efficiency η = ηᵗηᵈ applies to all four modes.
+_projected_state(μ::Real, ηᵗ::Real, ηᵈ::Real) =
+    project(_state(μ), projector([:, :, :, :]); η = fill(Float64(ηᵗ * ηᵈ), mds))
 
-_perm_matrix_12785634 = permutation_matrix([1,2,7,8,5,6,3,4])
+# The dual-rail Bell state (|1001⟩ + |0110⟩)/√2 that the source ideally emits.
+const ψ⁺ = (clicks([1, 0, 0, 1]) + clicks([0, 1, 1, 0])) / √2
 
 """
 $(TYPEDSIGNATURES)
 
-Construct the 8×8 covariance matrix for an SPDC source.
+Construct the covariance matrix for an SPDC source.
 
 # Parameters
 - μ: Mean photon number per mode
 
 # Returns
-8×8 `Float64` covariance matrix in qpqp ordering.
+8×8 `Float64` covariance matrix in qpqp ordering and the ħ=1 convention.
 """
 function covariance_matrix(μ::Real)::Matrix{Float64}
-    tmsv_covar = tmsv.covariance_matrix(μ)
-    covar = Matrix(BlockDiagonal([tmsv_covar, tmsv_covar]))
-    covar_qpqp = _perm_matrix_12785634 * covar * _perm_matrix_12785634'
-    return covar_qpqp
+    st = _state(μ)
+    _unreorder(st.covar ./ st.ħ)
 end
 covariance_matrix(spdc::SPDC) = covariance_matrix(spdc.mean_photon)
 
 """
 $(TYPEDSIGNATURES)
 
-Construct the 16×16 loss matrix for SPDC fidelity calculations.
+Calculate the spin-spin density matrix for the SPDC source conditioned on photon-number measurement outcome `nvec` after simulated mode-memory interaction.
 
-Encodes the combined transmission-detection loss η = ηᵗηᵈ for all four signal modes.
-The resulting matrix is added to the K-matrix before Wick evaluation of Bell-state overlap terms.
-
-# Parameters
-- ηᵗ: Outcoupling / transmission efficiency, ∈ [0, 1]
-- ηᵈ: Detection efficiency, ∈ [0, 1]
-
-# Returns
-16×16 `ComplexF64` loss matrix for fidelity: `A = k_function_matrix(cov) + loss_bsm_matrix_fid(ηᵗ, ηᵈ)`.
-"""
-function loss_bsm_matrix_fid(ηᵗ::Real, ηᵈ::Real)::Matrix{ComplexF64}
-    G = zeros(ComplexF64, 16, 16)
-    η = ηᵗ*ηᵈ
-
-    for i in 1:4
-        G[i,     i+2*mds] = (η - 1)
-        G[i,     i+3*mds] = -im*(η - 1)
-        G[i+mds, i+2*mds] = im*(η - 1)
-        G[i+mds, i+3*mds] = (η - 1)
-    end
-
-    return (G + transpose(G) + I) / 2
-end
-loss_bsm_matrix_fid(spdc::SPDC) = loss_bsm_matrix_fid(spdc.outcoupling_efficiency, spdc.detection_efficiency)
-
-"""
-Calculating the portion of the A matrix that arises due to incorporating loss, specifically for the trace of the BSM matrix
-"""
-loss_bsm_matrix_trace::Matrix{ComplexF64} = begin
-    G = zeros(ComplexF64, 16, 16)
-
-    for i in 1:4
-        G[i,     i+2*mds] = -1
-        G[i,     i+3*mds] = im
-        G[i+mds, i+2*mds] = -im
-        G[i+mds, i+3*mds] = -1
-    end
-
-    (G + transpose(G) + I) / 2
-end
-
-"""
-$(TYPEDSIGNATURES)
-
-Calculate a single element of the unnormalized spin-spin density matrix for the SPDC source.
-
-# Parameters
-- dmi  : Row index of the density matrix element (1–4, indexing the four Bell states)
-- dmj  : Column index of the density matrix element (1–4)
-- Ainv : Inverse A-matrix (from `k_function_matrix` + `loss_bsm_matrix_fid`)
-- nvec : Photon-number vector `[n₁, n₂, n₃, n₄]` for the four modes
-- ηᵗ   : Outcoupling / transmission efficiency
-- ηᵈ   : Detection efficiency
-
-# Returns
-Complex density matrix element ρ[dmi, dmj] (unnormalized).
-"""
-function dmijZ(dmi::Int, dmj::Int, Ainv::Matrix{ComplexF64}, nvec::Vector{Int}, ηᵗ::Real, ηᵈ::Real)::ComplexF64
-    η = [ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ, ηᵗ*ηᵈ]
-
-    # Calculate Ca based on dmi value
-    if dmi == 1
-        Ca₁ = ((α[1]*sqrt(η[1]) - α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Ca₂ = ((α[1]*sqrt(η[1]) + α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Ca₃ = ((α[3]*sqrt(η[3]) - α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Ca₄ = ((α[3]*sqrt(η[3]) + α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Ca = Ca₁*Ca₂*Ca₃*Ca₄
-    elseif dmi == 2
-        Ca₁ = ((α[1]*sqrt(η[1]) - α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Ca₂ = ((α[1]*sqrt(η[1]) + α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Ca₃ = ((α[3]*sqrt(η[3]) + α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Ca₄ = ((α[3]*sqrt(η[3]) - α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Ca = Ca₁*Ca₂*Ca₃*Ca₄
-    elseif dmi == 3
-        Ca₁ = ((α[1]*sqrt(η[1]) + α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Ca₂ = ((α[1]*sqrt(η[1]) - α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Ca₃ = ((α[3]*sqrt(η[3]) - α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Ca₄ = ((α[3]*sqrt(η[3]) + α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Ca = Ca₁*Ca₂*Ca₃*Ca₄
-    elseif dmi == 4
-        Ca₁ = ((α[1]*sqrt(η[1]) + α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Ca₂ = ((α[1]*sqrt(η[1]) - α[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Ca₃ = ((α[3]*sqrt(η[3]) + α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Ca₄ = ((α[3]*sqrt(η[3]) - α[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Ca = Ca₁*Ca₂*Ca₃*Ca₄
-    else
-        Ca = 1
-    end
-
-    # Calculate Cb based on dmj value
-    if dmj == 1
-        Cb₁ = ((β[1]*sqrt(η[1]) - β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Cb₂ = ((β[1]*sqrt(η[1]) + β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Cb₃ = ((β[3]*sqrt(η[3]) - β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Cb₄ = ((β[3]*sqrt(η[3]) + β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Cb = Cb₁*Cb₂*Cb₃*Cb₄
-    elseif dmj == 2
-        Cb₁ = ((β[1]*sqrt(η[1]) - β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Cb₂ = ((β[1]*sqrt(η[1]) + β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Cb₃ = ((β[3]*sqrt(η[3]) + β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Cb₄ = ((β[3]*sqrt(η[3]) - β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Cb = Cb₁*Cb₂*Cb₃*Cb₄
-    elseif dmj == 3
-        Cb₁ = ((β[1]*sqrt(η[1]) + β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Cb₂ = ((β[1]*sqrt(η[1]) - β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Cb₃ = ((β[3]*sqrt(η[3]) - β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Cb₄ = ((β[3]*sqrt(η[3]) + β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Cb = Cb₁*Cb₂*Cb₃*Cb₄
-    elseif dmj == 4
-        Cb₁ = ((β[1]*sqrt(η[1]) + β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[1])
-        Cb₂ = ((β[1]*sqrt(η[1]) - β[2]*sqrt(η[2])) * (1/sqrt(2)))^(nvec[2])
-        Cb₃ = ((β[3]*sqrt(η[3]) + β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[3])
-        Cb₄ = ((β[3]*sqrt(η[3]) - β[4]*sqrt(η[4])) * (1/sqrt(2)))^(nvec[4])
-        Cb = Cb₁*Cb₂*Cb₃*Cb₄
-    else
-        Cb = 1
-    end
-
-    C = Ca*Cb
-
-    # Sum over wick partitions
-    return W(C, Ainv)
-end
-
-"""
-$(TYPEDSIGNATURES)
-
-Calculate the 4×4 spin-spin density matrix for the SPDC source conditioned on photon-number measurement outcome `nvec` after simulated mode-memory interaction.
+Evaluated as [`Genqo.duankimble`](@ref) loading of the raw source into two spin memories, pairing
+the dual-rail modes (1,2) and (3,4).
 
 # Parameters
 - μ    : Mean photon number per mode
@@ -211,79 +82,20 @@ Calculate the 4×4 spin-spin density matrix for the SPDC source conditioned on p
 - nvec : Photon-number vector `[n₁, n₂, n₃, n₄]` for the four modes
 
 # Returns
-4×4 `ComplexF64` normalized spin-spin density matrix.
+4×4 `ComplexF64` spin-spin density matrix.
 """
 function spin_density_matrix(μ::Real, ηᵗ::Real, ηᵈ::Real, nvec::Vector{Int})::Matrix{ComplexF64}
-    lmat = 4
-    mat = Matrix{ComplexF64}(undef, lmat, lmat)
-    cov = reorder(covariance_matrix(μ))
-    A = k_function_matrix(cov) + loss_bsm_matrix_fid(ηᵗ, ηᵈ)
-    Ainv = inv(A)
-    Γ = cov + (1/2)*I
-    detΓ = det(Γ)
-
-    D1 = sqrt(det(A))
-    D2 = detΓ^(1/4)
-    D3 = conj(detΓ)^(1/4)
-    Coef = 1/(4*D1*D2*D3)
-
-    for i in 1:lmat
-        for j in 1:lmat
-            mat[i,j] = dmijZ(i, j, Ainv, nvec, ηᵗ, ηᵈ)
-        end
-    end
-
-    return Coef * mat
+    length(nvec) == mds || throw(ArgumentError("SPDC takes one photon-number outcome per mode, expected $mds but got $(length(nvec))"))
+    Matrix(duankimble(_projected_state(μ, ηᵗ, ηᵈ), nvec).data)
 end
 spin_density_matrix(spdc::SPDC, nvec::Vector{Int}) = spin_density_matrix(spdc.mean_photon, spdc.outcoupling_efficiency, spdc.detection_efficiency, nvec)
-
-"""
-    moment_vector::NamedTuple
-
-Symbolic moment polynomials used by SPDC, as a `NamedTuple` of Nemo polynomials in the global
-phase-space variables (`q/p` → α, β). Each entry is a specific Gaussian moment needed in SPDC
-calculations.
-
-Fields:
-- `bell_aa`, `bell_ab`, `bell_ba`, `bell_bb` — fidelity Bell-overlap moments
-- `trc` — trace moment (`α[3]α[4]β[3]β[4]`)
-
-These are evaluated numerically by contracting against `Ainv` via Wick's theorem, either directly
-with `tools.W(moment_vector.<name>, Ainv)` (slow path) or, more efficiently, through the
-precompiled `moment_terms.<name>` cache.
-"""
-const moment_vector = let
-    Ca1 = α[1] * α[4]
-    Ca2 = α[2] * α[3]
-    Cb1 = β[1] * β[4]
-    Cb2 = β[2] * β[3]
-
-    (
-        bell_aa = Ca1 * Cb1,
-        bell_ab = Ca1 * Cb2,
-        bell_ba = Ca2 * Cb1,
-        bell_bb = Ca2 * Cb2,
-        trc     = α[3] * α[4] * β[3] * β[4],
-    )
-end
-
-"""
-    moment_terms::NamedTuple
-
-Precompiled Wick terms for SPDC moment polynomials, mirroring the field names of `moment_vector`.
-
-Each field is a concrete `tools.WTerms{<:Tuple}` whose type is fixed at module load — so call
-sites like `tools.W(moment_terms.bell_aa, Ainv)` resolve to a fully type-stable specialized
-method, with no runtime dispatch.
-"""
-const moment_terms = map(extract_W_terms, moment_vector)
 
 """
 $(TYPEDSIGNATURES)
 
 Calculate the Bell-state fidelity of the single-mode SPDC source under loss.
 
-This computes the overlap ⟨Φ|ρ|Φ⟩ of the photon-photon state produced by the SPDC source with an ideal Bell state.
+This computes the overlap ⟨Φ|ρ|Φ⟩ of the photon-photon state produced by the SPDC source with an ideal Bell state. The source is unheralded, so ρ is *not* renormalized by a success probability and the result falls off with μ — divide by the coincidence probability to condition on a detected pair.
 
 # Parameters
 - μ  : Mean photon number
@@ -291,47 +103,15 @@ This computes the overlap ⟨Φ|ρ|Φ⟩ of the photon-photon state produced by 
 - ηᵈ : Detection efficiency
 
 # Returns
-Real-valued Bell-state fidelity of the SPDC source for the given parameters.
+Real-valued Bell-state overlap of the SPDC source for the given parameters.
 """
 function fidelity(μ::Real, ηᵗ::Real, ηᵈ::Real)::Real
-    cov = reorder(covariance_matrix(μ))
-
-    Γ = cov + (1/2) * I
-    detΓ = det(Γ)
-    K = k_function_matrix(cov)
-
-    # The loss matrix will be unique for calculating the fidelity    
-    # A1 (fidelity loss)
-    A1 = K + loss_bsm_matrix_fid(ηᵗ, ηᵈ)
-
-    # Factor + invers
-    factA1 = lu(A1)
-    Ainv1  = inv(factA1)
-    D1     = sqrt(det(factA1))  # sqrt(det(A1))
-
-    # Wick terms (cached)
-    Fsum =
-        W(moment_terms.bell_aa, Ainv1) +
-        W(moment_terms.bell_ab, Ainv1) +
-        W(moment_terms.bell_ba, Ainv1) +
-        W(moment_terms.bell_bb, Ainv1)
-
-    N1 = (ηᵗ * ηᵈ)^2
-
-    D2 = detΓ^(1/4)
-    D3 = conj(detΓ)^(1/4)
-
-    coef = N1 / (2 * D1 * D2 * D3)
-
-    value = coef * Fsum
+    value = dot(ψ⁺', _projected_state(μ, ηᵗ, ηᵈ), ψ⁺)
     if abs(imag(value)) > 1e-10
         @warn "fidelity has nontrivial imaginary part" imag=imag(value) value=value
     end
     return real(value)
 end
-
 fidelity(spdc::SPDC) = fidelity(spdc.mean_photon, spdc.outcoupling_efficiency, spdc.detection_efficiency)
-
-
 
 end # module

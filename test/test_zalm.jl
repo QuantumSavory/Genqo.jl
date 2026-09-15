@@ -7,7 +7,7 @@
     ψ⁺ = GroundTruth.bell4()
 
     # Signal modes (1, 2, 7, 8) are kept for the photon-photon state; BSM heralds on
-    # clicks in modes 3, 4 and vacuum in modes 5, 6 (cf. zalm.moment_vector.trc)
+    # clicks in modes 3, 4 and vacuum in modes 5, 6 (cf. the herald in `zalm`)
     Π = projector([-1, -1, 1, 1, 0, 0, -1, -1])
     zalm_η(ηᵗ, ηᵈ, ηᵇ) = [ηᵗ * ηᵈ, ηᵗ * ηᵈ, ηᵇ, ηᵇ, ηᵇ, ηᵇ, ηᵗ * ηᵈ, ηᵗ * ηᵈ]
 

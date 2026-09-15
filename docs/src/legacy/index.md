@@ -2,11 +2,11 @@
 
 The `Genqo.tools`, `Genqo.tmsv`, `Genqo.spdc`, `Genqo.zalm` and `Genqo.sigsag` submodules
 are the first generation of Genqo. Each wraps a single hard-coded source model: a parameter
-struct, a hand-built covariance matrix, and a fixed set of metrics computed from it.
+struct, a fixed Gaussian circuit, and a fixed set of metrics computed from it.
 
-They are retained because they are the numerical oracle the current framework is validated
-against, and because the Python wrapper is built on them. They are not where new work
-should start.
+They are retained because the Python wrapper is built on them, and because they are a
+convenient shorthand for the four source architectures Genqo was originally written for.
+They are not where new work should start.
 
 !!! warning "Superseded"
     New models should be built with the [v2 API](@ref api), which composes arbitrary
@@ -15,9 +15,17 @@ should start.
     modules compute — success probability, fidelity, spin density matrices — has a
     direct equivalent there.
 
-The legacy modules build covariance matrices in qpqp ordering and reorder to qqpp with
-[`Genqo.tools.reorder`](@ref) before contraction, and they use the ħ=1 convention rather
-than the ħ=2 convention Gabs uses.
+Each module is now a thin wrapper: it builds its source as a Gabs `GaussianState`, applies
+the detection outcome with [`Genqo.project`](@ref), and reads the metric off the resulting
+[`Genqo.ProjectedPureGaussianState`](@ref). The hand-rolled A-matrix construction and Wick
+bookkeeping that used to live here are gone, so the legacy entry points and their v2
+equivalents are the same calculation to within floating-point round-off.
+
+Two conventions survive from the original code. `tmsv` and `spdc` report their covariance
+matrices in qpqp ordering (convert with [`Genqo.tools.reorder`](@ref)), while `zalm` and
+`sigsag` report qqpp; and all four use the ħ=1 convention rather than the ħ=2 convention
+Gabs uses, so a reported covariance matrix is half the `covar` field of the underlying
+Gabs state.
 
 ## Contents
 

@@ -10,7 +10,7 @@
 # Parameters are fixed (no randomness) so timings are comparable across revisions.
 
 using Genqo
-using Genqo: _wick_partitions
+using Genqo: _wick_partitions, _invA_UL
 using Gabs
 using BenchmarkTools
 
@@ -18,17 +18,6 @@ const SUITE = BenchmarkGroup()
 
 const μ = 1e-2
 const ηᵗ, ηᵈ, ηᵇ = 0.9, 0.8, 0.85
-
-
-# Wick contraction kernels
-
-zalm_Ainv() = inv(tools.k_function_matrix(zalm.covariance_matrix(μ)) + zalm.loss_bsm_matrix_fid(ηᵗ, ηᵈ, ηᵇ))
-bell_sum = zalm.moment_vector.bell_aa + zalm.moment_vector.bell_ab +
-           zalm.moment_vector.bell_ba + zalm.moment_vector.bell_bb
-
-SUITE["wick.partitions_N8"] = @benchmarkable _wick_partitions(Int8(8))
-SUITE["wick.extract_W_terms"] = @benchmarkable extract_W_terms($bell_sum)
-SUITE["wick.W_zalm_bell"] = @benchmarkable W(terms, Ainv) setup = (terms = extract_W_terms($bell_sum); Ainv = zalm_Ainv())
 
 
 # v2 generalized framework: ZALM source built from Gabs circuits, projected with a
@@ -53,6 +42,26 @@ const ψ⁺ᵈ = ψ⁺'
 
 const ENGINE12 = HybridProjectionEngine(12) # emissive loading needs 2 extra modes per memory
 const DK_d = [1, 0, 1, 0]
+
+
+# Wick contraction kernels, exercised on the ZALM Bell-overlap moment: a degree-8 monomial sum
+# contracted against the projection kernel. The kernel is the 2N×2N upper-left block of A⁻¹ --
+# all the contraction actually reads -- and the dominant cost, the degree-8 hafnian, is unchanged.
+
+zalm_σ(μ) = let st = zalm_state(μ); st.covar ./ st.ħ end
+zalm_Ainv() = first(_invA_UL(zalm_σ(μ), ZALM_η, [0, 0, 1, 1, 0, 0, 0, 0]))
+
+const bell_sum = let (α, βc) = get_phase_space_generators_half(ENGINE8)
+    Ca₁ = α[1] * α[3] * α[4] * α[8]
+    Ca₂ = α[2] * α[3] * α[4] * α[7]
+    Cb₁ = βc[1] * βc[3] * βc[4] * βc[8]
+    Cb₂ = βc[2] * βc[3] * βc[4] * βc[7]
+    Ca₁ * Cb₁ + Ca₁ * Cb₂ + Ca₂ * Cb₁ + Ca₂ * Cb₂
+end
+
+SUITE["wick.partitions_N8"] = @benchmarkable _wick_partitions(Int8(8))
+SUITE["wick.extract_W_terms"] = @benchmarkable extract_W_terms($bell_sum)
+SUITE["wick.W_zalm_bell"] = @benchmarkable W(terms, Ainv) setup = (terms = extract_W_terms($bell_sum); Ainv = zalm_Ainv())
 
 let ps = project(zalm_state(μ), ZALM_Π; η = ZALM_η) # warm the C-polynomial caches
     tr(ps; engine = ENGINE8)

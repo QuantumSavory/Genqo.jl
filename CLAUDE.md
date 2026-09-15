@@ -16,7 +16,7 @@ Common tasks are in the `justfile`:
 
 - `just install` — instantiate root/test/docs/benchmark Julia projects and set up the Python venv (`python/.venv`) with the wrapper and reference package
 - `just test` — Julia test suite (what CI's Julia job runs via `Pkg.test()`): TestItemRunner `@testitem`s in `test/test_*.jl` validating the v2 framework against v1 ground truth in `test/data/ground_truth.jld2`
-- `just ground-truth` — regenerate that JLD2 with the v1 legacy code (deterministic, fixed `StableRNG` seed in `test/gt_common.jl`); rerun and commit whenever the parameter sets change
+- `just ground-truth` — regenerate that JLD2 from `test/ground_truth/` (deterministic, fixed `StableRNG` seed in `test/gt_common.jl`); rerun and commit only when the parameter sets change
 - `just bench [func]` — Julia regression benchmarks (`benchmark/benchmarks.jl`), e.g. `just bench project.tr`; `func` is a substring filter
 - `just asv <rev>` — AirspeedVelocity.jl regression benchmarks against previous commits (same suite)
 - `just test-py` — pytest comparison suite validating the v1 legacy code against the reference Python implementation, plus a precision report (writes to `.benchmarks/`)
@@ -46,7 +46,15 @@ Built on [Gabs.jl](https://github.com/QuantumSavory/Gabs.jl) `GaussianState`/`Ga
 
 ### v1 legacy code (`src/legacy/`, submodules `tools`, `tmsv`, `spdc`, `zalm`, `sigsag`)
 
-Each source model is a self-contained submodule with a parameter struct (e.g. `zalm.ZALM`) and functions like `covariance_matrix`, `spin_density_matrix`, `probability_success`, `fidelity`. These build covariance matrices by hand (qpqp ordering, reordered to qqpp by `tools.reorder` before `tools.k_function_matrix`) and share the Wick machinery from `src/wick.jl`. This is the code path the Python wrapper and the comparison suites exercise; it is validated numerically against `test/genqo_old_pkg` and serves as the ground-truth oracle for the v2 Julia tests (legacy covariances are ħ=1; wrap with `legacy_state` from `test/gt_common.jl` to feed them to v2 `project`).
+Each source model is a self-contained submodule with a parameter struct (e.g. `zalm.ZALM`) and functions like `covariance_matrix`, `spin_density_matrix`, `probability_success`, `fidelity`. These are now thin wrappers over the v2 framework: a private `_state(μ)` builds the source as a Gabs `GaussianState` (tutorial style — `eprstate`/`modeswap`/`beamsplitter`/`vacuumstate` in `QuadBlockBasis`, squeezing phase θ=π to match the legacy sign convention), and each metric is read off a `project`ion of it via `tr`/`dot`/`fidelity`/`duankimble`. ZALM's dark-count model has no v2 equivalent and is expressed as a weighted sum of `tr` over the heralding patterns a real photon can be missing from.
+
+Two legacy conventions survive: `tmsv` and `spdc` report covariance matrices in qpqp ordering (`tools.reorder` converts to qqpp, `tools._unreorder` back), `zalm` and `sigsag` in qqpp; and all four use ħ=1, so a reported matrix is `st.covar ./ st.ħ`. Wrap one with `legacy_state` from `test/gt_common.jl` to feed it back to v2 `project`.
+
+This is the code path the Python wrapper and the comparison suites exercise, and it is validated numerically against `test/genqo_old_pkg`.
+
+### The ground-truth oracle (`test/ground_truth/`)
+
+`test/ground_truth/GenqoV1.jl` holds the original v1 implementation of all five legacy submodules, frozen at commit 8d75cae — the last revision before `src/legacy/` became a v2 wrapper. It is the independent oracle behind `test/data/ground_truth.jld2`: it builds covariance matrices by hand, assembles `A = k_function_matrix(cov) + loss_matrix` and inverts it whole, and contracts hand-written moment polynomials, sharing nothing with v2 but the Wick evaluator in `src/wick.jl`. Only `test/generate_ground_truth.jl` should reference it, always qualified as `GenqoV1.<source>` so it cannot be confused with the identically-named `Genqo.<source>` submodules. Treat it as frozen: if v2 disagrees with it, v2 is what changed.
 
 ### Performance conventions
 

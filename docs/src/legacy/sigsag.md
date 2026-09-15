@@ -15,10 +15,8 @@ Genqo.sigsag.fidelity
 Genqo.sigsag.probability_success
 ```
 
-## Internal Matrices
+## Circuit
 
 ```@docs
 Genqo.sigsag.covariance_matrix
-Genqo.sigsag.loss_bsm_matrix_fid
-Genqo.sigsag.loss_bsm_matrix_pgen
 ```

@@ -60,16 +60,6 @@ def test_tmsv__covariance_matrix(tmsv_jl: gqjl.TMSV, tmsv_test_cases: list[dict]
 
         assert np.allclose(covariance_matrix_py, covariance_matrix_jl, atol=tol), error_with_params(params)
 
-def test_tmsv__loss_matrix_pgen(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_test_cases: list[dict]) -> None:
-    for params in tmsv_test_cases:
-        tmsv_py.params.update(params)
-        tmsv_py.calculate_loss_matrix()
-        loss_bsm_matrix_py = tmsv_py.results["loss_matrix"]
-
-        tmsv_jl.set(**params)
-        loss_bsm_matrix_jl = tmsv_jl.loss_matrix_pgen()
-
-        assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
 def test_tmsv__probability_success(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV, tmsv_test_cases: list[dict], precision_table: list) -> None:
     for params in tmsv_test_cases:
@@ -101,16 +91,6 @@ def test_spdc__covariance_matrix(spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict]
 
         assert np.allclose(covariance_matrix_py, covariance_matrix_jl, atol=tol), error_with_params(params)
 
-def test_spdc__loss_bsm_matrix_fid(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict]) -> None:
-    for params in spdc_test_cases:
-        spdc_py.params.update(params)
-        spdc_py.calculate_loss_matrix_fid()
-        loss_bsm_matrix_py = spdc_py.results["loss_bsm_matrix"]
-
-        spdc_jl.set(**params)
-        loss_bsm_matrix_jl = spdc_jl.loss_bsm_matrix_fid()
-
-        assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
 def test_spdc__spin_density_matrix(spdc_py: gqpy.SPDC, spdc_jl: gqjl.SPDC, spdc_test_cases: list[dict], precision_table: list) -> None:
     nvec = np.array([0,1,0,1])
@@ -183,27 +163,7 @@ def test_zalm__covariance_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_te
 
         assert np.allclose(covariance_matrix_py, covariance_matrix_jl, atol=tol), error_with_params(params)
 
-def test_zalm__loss_bsm_matrix_fid(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
-    for params in zalm_test_cases:
-        zalm_py.params.update(params)
-        zalm_py.calculate_loss_bsm_matrix_fid()
-        loss_bsm_matrix_py = zalm_py.results["loss_bsm_matrix"]
 
-        zalm_jl.set(**params)
-        loss_bsm_matrix_jl = zalm_jl.loss_bsm_matrix_fid()
-
-        assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
-
-def test_zalm__loss_bsm_matrix_pgen(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
-    for params in zalm_test_cases:
-        zalm_py.params.update(params)
-        zalm_py.calculate_loss_bsm_matrix_pgen()
-        loss_bsm_matrix_py = zalm_py.results["loss_bsm_matrix"]
-
-        zalm_jl.set(**params)
-        loss_bsm_matrix_jl = zalm_jl.loss_bsm_matrix_pgen()
-
-        assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
 def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict], precision_table: list) -> None:
     nvec = np.array([1,0,1,1,0,0,1,0])
@@ -289,16 +249,6 @@ def test_sigsag__covariance_matrix(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SI
 
         assert np.allclose(covariance_matrix_py, covariance_matrix_jl, atol=tol), error_with_params(params)
 
-def test_sigsag__loss_bsm_matrix_fid(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict]) -> None:
-    for params in sigsag_test_cases:
-        sigsag_py.params.update(params)
-        sigsag_py.calculate_loss_matrix_fid()
-        loss_bsm_matrix_py = sigsag_py.results["loss_bsm_matrix"]
-
-        sigsag_jl.set(**params)
-        loss_bsm_matrix_jl = sigsag_jl.loss_bsm_matrix_fid()
-
-        assert np.allclose(loss_bsm_matrix_py, loss_bsm_matrix_jl, atol=tol), error_with_params(params)
 
 def test_sigsag__probability_success(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sigsag_test_cases: list[dict], precision_table: list) -> None:
     for params in sigsag_test_cases:
@@ -339,16 +289,6 @@ def test_sigsag__fidelity(sigsag_py: gqpy.SIGSAG_BS, sigsag_jl: gqjl.SIGSAG, sig
 
 # Other tests
 
-def test_tools__k_function_matrix(zalm_py: gqpy.ZALM, zalm_jl: gqjl.ZALM, zalm_test_cases: list[dict]) -> None:
-    for params in zalm_test_cases:
-        zalm_py.params.update(params)
-        zalm_py.run()
-        k_function_matrix_py = zalm_py.results["k_function_matrix"]
-
-        zalm_jl.set(**params)
-        k_function_matrix_jl = gqjl.k_function_matrix(zalm_jl.covariance_matrix())
-
-        assert np.allclose(k_function_matrix_py, k_function_matrix_jl, atol=tol), error_with_params(params)
 
 def test_linsweep_1d(tmsv_py: gqpy.TMSV, tmsv_jl: gqjl.TMSV) -> None:
     tmsv_py.params["detection_efficiency"] = 0.9

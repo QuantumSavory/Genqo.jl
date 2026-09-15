@@ -14,9 +14,8 @@ Genqo.tmsv.TMSV
 Genqo.tmsv.probability_success
 ```
 
-## Internal Matrices
+## Circuit
 
 ```@docs
 Genqo.tmsv.covariance_matrix
-Genqo.tmsv.loss_matrix_pgen
 ```
