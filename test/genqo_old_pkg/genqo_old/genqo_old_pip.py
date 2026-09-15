@@ -965,7 +965,7 @@ class SPDC:
         F3 = tools.W(Cn3, nA1, self.basisv)
         F4 = tools.W(Cn4, nA1, self.basisv)
 
-        N1 = ((self.params["detection_efficiency"]**2)*(self.params["outcoupling_efficiency"]**2))**2
+        N1 = (self.params["detection_efficiency"] * self.params["outcoupling_efficiency"])**2
         D1 = np.sqrt(np.linalg.det(nA1))
         D2 = (np.linalg.det(Gam))**(0.25)
         D3 = (np.linalg.det(np.conjugate(Gam)))**(0.25)
