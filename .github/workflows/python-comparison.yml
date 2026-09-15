@@ -29,7 +29,8 @@ permissions:
 jobs:
   python-comparison-tests:
     name: Python Comparison Tests
-    runs-on: ubuntu-latest
+    # NOT ubuntu-latest. Need ubuntu-26.04 until ubuntu-latest is on OpenSSL >= 3.5, which Julia 1.12 requires.
+    runs-on: ubuntu-26.04
     timeout-minutes: 60
     permissions:
       actions: write # lets julia-actions/cache prune old caches it created
