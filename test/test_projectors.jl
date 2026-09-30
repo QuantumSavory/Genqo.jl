@@ -20,8 +20,6 @@ end
     # Loss vector must lie in [0, 1]
     @test_throws ArgumentError project(st, projector([1, 1]); η = [0.9, 1.1])
     @test_throws ArgumentError project(st, projector([1, 1]); η = [-0.1, 0.9])
-    # Detector outcomes are restricted to {-1, 0, 1} (higher photon numbers are a TODO)
-    @test_throws ArgumentError project(st, projector([2, 1]))
     # Only pure Gaussian states are supported
     @test_throws ArgumentError project(thermalstate(QuadBlockBasis(2), 2), projector([1, 1]))
 
@@ -57,6 +55,25 @@ end
     # Together with the mutually exclusive complements, probabilities sum to 1
     total = p_sum + tr(project(st, projector([0, 0]) + projector([1, 1]); η = η); engine)
     @test total < 1 # cutoff at 1 photon per mode leaves out higher-number events
+
+    # Multi-photon click patterns: a TMSV puts weight (1-λ²)λ²ⁿ on |n,n⟩ and nothing at all
+    # on patterns whose two photon numbers differ
+    λ = tanh(asinh(√1e-1))
+    for n in 2:3
+        @test tr(project(st, projector([n, n])); engine) ≈ (1 - λ^2) * λ^(2n)
+    end
+    @test tr(project(st, projector([2, 3])); engine) ≈ 0 atol = 1e-14
+    # Detector loss breaks that perfect number correlation, so [2,3] picks up weight
+    @test tr(project(st, projector([2, 3]); η = η); engine) > 0
+
+    # tr and dot share the engine's compiled-polynomial cache, so for a multi-photon pattern
+    # they must agree on ⟨n|ρ|n⟩ whichever of them fills a given entry first
+    for tr_first in (true, false)
+        e, pat = HybridProjectionEngine(2), [2, 2]
+        tr_first && tr(project(st, projector(pat); η = η); engine = e)
+        @test dot(clicks(pat)', project(st, projector([:, :]); η = η), clicks(pat); engine = e) ≈
+              tr(project(st, projector(pat); η = η); engine = e)
+    end
 
     # Repeated evaluation hits the compiled-polynomial cache and reproduces the result
     @test !isempty(engine.C_poly_cache)

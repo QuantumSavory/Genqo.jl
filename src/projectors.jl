@@ -157,7 +157,8 @@ The detection outcome measuring `clicks[i]` photons in mode `i`. A `Colon` (`:`)
 mode that is traced out instead of detected, so `projector([1, :])` detects one photon in
 mode 1 and leaves mode 2 free.
 
-Detected outcomes are currently restricted to 0 or 1 photons per mode. Sum projectors with
+Outcomes may name any non-negative photon number, so `projector([2, 3])` is the
+number-resolved outcome of two photons in mode 1 and three in mode 2. Sum projectors with
 `+` to describe projection onto a superposition of click patterns, such as a parity
 measurement.
 """
@@ -311,7 +312,7 @@ struct ProjectedPureGaussianState <: AbstractProjectedPureGaussianState
         all(η .≥ 0) && all(η .≤ 1) || throw(ArgumentError("Loss vector must be between 0 and 1"))
         all(iszero.(st.mean)) || throw(ArgumentError("Input Gaussian state must have zero displacement"))
         purity(st) ≈ 1. || throw(ArgumentError("Input Gaussian state must be pure"))
-        all(proj.clicks .== 0 .|| proj.clicks .== 1 .|| proj.clicks .== -1) || throw(ArgumentError("Detector outcomes must be 0, 1, or -1")) # TODO: support multi-photon number outcomes
+        all(proj.clicks .≥ -1) || throw(ArgumentError("Detector outcomes must be positive integers or -1"))
         new(st, proj, η)
     end
 end
@@ -371,7 +372,7 @@ $(TYPEDSIGNATURES)
 The unnormalized density-matrix element of the projected state between `bra` and `ket`,
 which range over the free modes of the projection.
 """
-function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)))::ComplexF64 # TODO: is this the right return type?
+function dot(bra::ClickStateBra, projected_state::ProjectedPureGaussianState, ket::ClickStateKet; engine::HybridProjectionEngine=get_default_engine(nmodes(projected_state)))::ComplexF64
     nmodes(projected_state) == engine.mds || throw(ArgumentError("Engine must have the same number of modes as the projected state"))
 
     st = projected_state.st
