@@ -226,7 +226,7 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
     C_poly_cache::Dict{Tuple{Vector{Int}, Vector{Int}}, WTerms}
     const C_poly_cache_lock::ReentrantLock # for multithreading safety
 
-    C_poly_cache_ext::Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Int, Int}, WTerms}
+    C_poly_cache_ext::Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Vector{Tuple{Int,Int}}, Int, Int}, WTerms}
     const C_poly_cache_ext_lock::ReentrantLock
 
     function HybridProjectionEngine(mds::Int)
@@ -242,7 +242,7 @@ mutable struct HybridProjectionEngine <: AbstractProjectionEngine
         new(
             mds, generators_half, generators_full,
             Dict{Tuple{Vector{Int}, Vector{Int}}, WTerms}(), ReentrantLock(),
-            Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Int, Int}, WTerms}(), ReentrantLock(),
+            Dict{Tuple{Vector{Int}, Vector{Float64}, Vector{Int}, Vector{Tuple{Int,Int}}, Int, Int}, WTerms}(), ReentrantLock(),
         )
     end
 end
@@ -485,7 +485,7 @@ function duankimble(projected_state::ProjectedPureGaussianState, d::Vector{Int},
         r, s = i - 1, j - 1
         ρᵣₛ = zero(ComplexF64)
         for (nf, invA, ηweight, denom) in shared
-            C = @lock engine.C_poly_cache_ext_lock get!(engine.C_poly_cache_ext, (nf, η, d, r, s)) do
+            C = @lock engine.C_poly_cache_ext_lock get!(engine.C_poly_cache_ext, (nf, η, d, modes, r, s)) do
                 _duankimble_poly(α, βc, η, nf, d, modes, r, s)
             end
             ρᵣₛ += W(C, invA) * ηweight / denom

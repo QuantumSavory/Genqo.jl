@@ -37,6 +37,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - `fidelity` was ambiguous when both `Genqo` and `Gabs` were loaded; Genqo now extends the shared `QuantumInterface.fidelity` binding re-exported by Gabs/QuantumOpticsBase.
 - `tr(::ProjectedPureGaussianState)` asserted an exactly-zero imaginary part, which failed spuriously (imaginary residues ~1e-36) for circuit-built states; the assertion is now a relative tolerance.
 - `tr` and `dot` cached mutually incompatible moment polynomials under the same `C_poly_cache` key: `tr` folded the `1/∏nᵢ!` Fock normalization into the cached polynomial while `dot` kept the polynomial bare and applied the factorial separately. Whichever ran first on a given engine won, and the other was then off by `∏nᵢ!` for any click pattern with more than one photon in a mode (patterns of 0 or 1 photons were unaffected, since their factorials are all 1). `tr` now caches the same bare monomial as `dot` and normalizes in its own weight.
+- Calls to `duankimble` with different `modes` would erroneously share the same cache entries in `C_poly_cache_ext`; this is separated now by including `modes` in the cache key.
 - Issue where the `Release` workflow mangled release notes that included text in backticks.
 
 ## [1.2.0] - 2026-04-30
