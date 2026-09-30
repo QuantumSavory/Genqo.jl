@@ -7,8 +7,7 @@ memories and return the resulting spin density matrix as a
 Both return an operator backed by a [`LazyDensityMatrix`](@ref): entries are contracted on
 first access and memoized thereafter. This behaves like an ordinary dense operator, but
 skips the entries a calculation never reads — `tr(ρ)` touches only the `M` diagonal entries
-out of `M²`. Any whole-matrix operation materializes it, so arithmetic such as `ρ * 4` or
-`ρ ./= p` yields an ordinary dense operator rather than another lazy wrapper.
+Scalar arithmetic such as `ρ * 4` remains lazy; operations that require a dense operator can be materialized explicitly with `dense(ρ)`.
 
 ```julia
 ρ = duankimble(project(st, Π), [1, 1])
