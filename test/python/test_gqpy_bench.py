@@ -12,9 +12,6 @@ def test_tmsv__probability_success(tmsv_py: gqpy.TMSV, benchmark):
 def test_tmsv__covariance_matrix(tmsv_py: gqpy.TMSV, benchmark):
     benchmark(tmsv_py.calculate_covariance_matrix)
 
-def test_tmsv__loss_matrix_pgen(tmsv_py: gqpy.TMSV, benchmark):
-    benchmark(tmsv_py.calculate_loss_matrix)
-
 
 # SPDC benchmarks
 
@@ -26,9 +23,6 @@ def test_spdc__spin_density_matrix(spdc_py: gqpy.SPDC, benchmark):
 
 def test_spdc__covariance_matrix(spdc_py: gqpy.SPDC, benchmark):
     benchmark(spdc_py.calculate_covariance_matrix)
-
-def test_spdc__loss_bsm_matrix_fid(spdc_py: gqpy.SPDC, benchmark):
-    benchmark(spdc_py.calculate_loss_matrix_fid)
 
 
 # ZALM benchmarks
@@ -45,17 +39,12 @@ def test_zalm__spin_density_matrix(zalm_py: gqpy.ZALM, benchmark):
 def test_zalm__covariance_matrix(zalm_py: gqpy.ZALM, benchmark):
     benchmark(zalm_py.calculate_covariance_matrix)
 
-def test_zalm__loss_bsm_matrix_fid(zalm_py: gqpy.ZALM, benchmark):
-    benchmark(zalm_py.calculate_loss_bsm_matrix_fid)
-
 
 # SIGSAG benchmarks
 
 def test_sigsag__covariance_matrix(sigsag_py: gqpy.SIGSAG_BS, benchmark):
     benchmark(sigsag_py.calculate_covariance_matrix)
 
-def test_sigsag__loss_bsm_matrix_fid(sigsag_py: gqpy.SIGSAG_BS, benchmark):
-    benchmark(sigsag_py.calculate_loss_matrix_fid)
 
 def test_sigsag__probability_success(sigsag_py: gqpy.SIGSAG_BS, benchmark):
     benchmark(lambda: sigsag_py.run() and sigsag_py.calculate_probability_success())
@@ -66,9 +55,6 @@ def test_sigsag__fidelity(sigsag_py: gqpy.SIGSAG_BS, benchmark):
 
 # Other benchmarks
 
-def test_tools__k_function_matrix(zalm_py: gqpy.ZALM, benchmark):
-    zalm_py.calculate_covariance_matrix()
-    benchmark(zalm_py.calculate_k_function_matrix)
 
 def test_linsweep_1d(tmsv_py: gqpy.TMSV, benchmark):
     def linsweep_1d():

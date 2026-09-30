@@ -1,17 +1,5 @@
-using Genqo
-using Test
+using TestItemRunner
 
-@testset "TMSV" begin
-    @test !isnan(tmsv.probability_success(1e-2, 0.9))
-end
+println("Starting tests with $(Threads.nthreads()) threads out of `Sys.CPU_THREADS = $(Sys.CPU_THREADS)`...")
 
-@testset "SPDC" begin
-    @test !any(isnan, spdc.spin_density_matrix(1e-4, 0.9, 0.6, [0,1,0,1]))
-    @test !isnan(spdc.fidelity(1e-2, 0.8, 0.6))
-end
-
-@testset "ZALM" begin
-    @test !any(isnan, zalm.spin_density_matrix(1e-4, 0.9, 0.6, 0.8, [1,0,1,1,0,0,1,0]))
-    @test !isnan(zalm.probability_success(1e-2, 0.8, 0.6, 0.9, 0.2))
-    @test !isnan(zalm.fidelity(1e-2, 0.8, 0.6, 0.9))
-end
+@run_package_tests

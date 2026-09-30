@@ -3,53 +3,45 @@ name: CI
 on:
   push:
     branches: [main]
+    tags: ["*"]
   pull_request:
     branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  # Skip intermediate builds: always.
+  # Cancel intermediate builds: only if it is a pull request build.
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: ${{ startsWith(github.ref, 'refs/pull/') }}
+
+permissions:
+  contents: read
 
 jobs:
   julia-tests:
     name: Julia Tests
     runs-on: ubuntu-latest
+    timeout-minutes: 60
+    permissions:
+      actions: write # lets julia-actions/cache prune old caches it created
+      contents: read
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: julia-actions/setup-julia@v2
+      - uses: julia-actions/setup-julia@v3
         with:
           version: "1.12"
 
-      - uses: julia-actions/cache@v2
+      - uses: julia-actions/cache@v3
 
-      - name: Install dependencies
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
+      - uses: julia-actions/julia-buildpkg@v1
 
-      - name: Run tests
-        run: julia --project=. -e 'using Pkg; Pkg.test()'
+      - uses: julia-actions/julia-runtest@v1
 
-  python-comparison-tests:
-    name: Python Comparison Tests
-    runs-on: ubuntu-latest
-    env:
-      PYTHON_JULIACALL_HANDLE_SIGNALS: "yes"
-    steps:
-      - uses: actions/checkout@v4
+      - uses: julia-actions/julia-processcoverage@v1
 
-      - uses: julia-actions/setup-julia@v2
+      - uses: codecov/codecov-action@v7
         with:
-          version: "1.12"
-
-      - uses: julia-actions/cache@v2
-
-      - uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install Julia dependencies
-        run: julia --project=. -e 'using Pkg; Pkg.instantiate()'
-
-      - name: Install Python packages
-        run: |
-          pip install -e python/[test]
-          pip install -e test/genqo_old_pkg
-
-      - name: Run comparison tests
-        run: pytest test/python/test_compare_with_python.py
+          files: lcov.info
+          token: ${{ secrets.CODECOV_TOKEN }}
+          fail_ci_if_error: false

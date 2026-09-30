@@ -16,11 +16,8 @@ Genqo.zalm.probability_success
 Genqo.zalm.spin_density_matrix
 ```
 
-## Internal Matrices
+## Circuit
 
 ```@docs
 Genqo.zalm.covariance_matrix
-Genqo.zalm.loss_bsm_matrix_fid
-Genqo.zalm.loss_bsm_matrix_pgen
-Genqo.zalm.dmijZ
 ```

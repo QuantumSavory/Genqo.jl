@@ -1,4 +1,5 @@
 using Genqo
+using Genqo: _wick_partitions
 using BenchmarkTools
 
 # Get optional function filter and output directory from command line arguments
@@ -17,7 +18,6 @@ rand_tmsv() = tmsv.TMSV(
     uniform(0.5, 1.0),
 )
 SUITE["tmsv.covariance_matrix"]      = @benchmarkable tmsv.covariance_matrix(t)           setup=(t=rand_tmsv())
-SUITE["tmsv.loss_matrix_pgen"]       = @benchmarkable tmsv.loss_matrix_pgen(t)            setup=(t=rand_tmsv())
 SUITE["tmsv.probability_success"]    = @benchmarkable tmsv.probability_success(t)         setup=(t=rand_tmsv())
 
 
@@ -31,7 +31,6 @@ rand_spdc() = spdc.SPDC(
 nvec = [0,1,0,1]
 
 SUITE["spdc.covariance_matrix"]      = @benchmarkable spdc.covariance_matrix(s)           setup=(s=rand_spdc())
-SUITE["spdc.loss_bsm_matrix_fid"]    = @benchmarkable spdc.loss_bsm_matrix_fid(s)         setup=(s=rand_spdc())
 SUITE["spdc.spin_density_matrix"]    = @benchmarkable spdc.spin_density_matrix(s, $nvec)  setup=(s=rand_spdc())
 SUITE["spdc.fidelity"]               = @benchmarkable spdc.fidelity(s)                    setup=(s=rand_spdc())
 
@@ -48,7 +47,6 @@ rand_zalm() = zalm.ZALM(
 nvec = [1,0,1,1,0,0,1,0]
 
 SUITE["zalm.covariance_matrix"]      = @benchmarkable zalm.covariance_matrix(z)           setup=(z=rand_zalm())
-SUITE["zalm.loss_bsm_matrix_fid"]    = @benchmarkable zalm.loss_bsm_matrix_fid(z)         setup=(z=rand_zalm())
 SUITE["zalm.spin_density_matrix"]    = @benchmarkable zalm.spin_density_matrix(z, $nvec)  setup=(z=rand_zalm())
 SUITE["zalm.probability_success"]    = @benchmarkable zalm.probability_success(z)         setup=(z=rand_zalm())
 SUITE["zalm.fidelity"]               = @benchmarkable zalm.fidelity(z)                    setup=(z=rand_zalm())
@@ -64,7 +62,6 @@ rand_sigsag() = sigsag.SIGSAG(
 )
 
 SUITE["sigsag.covariance_matrix"]      = @benchmarkable sigsag.covariance_matrix(s)           setup=(s=rand_sigsag())
-SUITE["sigsag.loss_bsm_matrix_fid"]    = @benchmarkable sigsag.loss_bsm_matrix_fid(s)         setup=(s=rand_sigsag())
 SUITE["sigsag.probability_success"]    = @benchmarkable sigsag.probability_success(s)         setup=(s=rand_sigsag())
 SUITE["sigsag.fidelity"]               = @benchmarkable sigsag.fidelity(s)                    setup=(s=rand_sigsag())
 
@@ -75,7 +72,7 @@ SUITE["sigsag.fidelity"]               = @benchmarkable sigsag.fidelity(s)      
 # once. The new algorithm (tools._wick_partitions) builds pairings recursively, only
 # emitting valid perfect matchings.
 function _wick_partitions_old(n::Int)
-    @assert iseven(n) "n must be even"
+    iseven(n) || throw(ArgumentError("n must be even"))
     all_partitions = Vector{Vector{Tuple{Int,Int}}}()
 
     # Mimic itertools.combinations(range(n), 2)
@@ -110,13 +107,12 @@ function _wick_partitions_old(n::Int)
 end
 
 for N in (2, 4, 6, 8)
-    SUITE["pmp.new.N=$N"] = @benchmarkable tools._wick_partitions($N)
+    SUITE["pmp.new.N=$N"] = @benchmarkable _wick_partitions($N)
     SUITE["pmp.old.N=$N"] = @benchmarkable _wick_partitions_old($N)
 end
 
 
 # Other benchmarks
-SUITE["tools.k_function_matrix"]     = @benchmarkable tools.k_function_matrix(cov) setup=(cov=zalm.covariance_matrix(rand_zalm()))
 SUITE["linsweep_1d"]                 = @benchmarkable tmsv.probability_success.(range(1e-4, stop=1e-2, length=100), 0.7)
 SUITE["linsweep_2d"]                 = @benchmarkable tmsv.probability_success.(range(1e-4, stop=1e-2, length=100), [0.2, 0.5, 0.6, 0.7, 0.9]')
 SUITE["logsweep_1d"]                 = @benchmarkable tmsv.probability_success.(logrange(1e-4, 1e-2, length=100), 0.7)
@@ -125,20 +121,20 @@ SUITE["logsweep_1d"]                 = @benchmarkable tmsv.probability_success.(
 # If running this file directly, run benchmarks
 if abspath(PROGRAM_FILE) == @__FILE__
     # Filter suite based on func_filter if provided
+    suite = SUITE
     if !isempty(func_filter)
-        filtered_suite = BenchmarkGroup()
+        suite = BenchmarkGroup()
         for (name, benchmark) in SUITE
             if occursin(func_filter, name)
-                filtered_suite[name] = benchmark
+                suite[name] = benchmark
             end
         end
-        SUITE = filtered_suite
-        if isempty(SUITE)
+        if isempty(suite)
             @warn "No benchmarks matched filter: $func_filter"
         end
     end
 
-    results = run(SUITE)
+    results = run(suite)
     for (func, trial) in results
         println("$func:")
         display(trial)

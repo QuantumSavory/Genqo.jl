@@ -1,10 +1,19 @@
 module Genqo
 
-include("tools.jl")
-include("tmsv.jl")
-include("spdc.jl")
-include("zalm.jl")
-include("sigsag.jl")
+using DocStringExtensions
+
+# Genqo v2 generalized framework
+include("wick.jl")
+include("lazy.jl")
+include("unitaries.jl")
+include("projectors.jl")
+
+# Genqo v1 legacy code
+include("legacy/tools.jl")
+include("legacy/tmsv.jl")
+include("legacy/spdc.jl")
+include("legacy/zalm.jl")
+include("legacy/sigsag.jl")
 
 import .tools
 import .tmsv

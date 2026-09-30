@@ -15,10 +15,8 @@ Genqo.spdc.fidelity
 Genqo.spdc.spin_density_matrix
 ```
 
-## Internal Matrices
+## Circuit
 
 ```@docs
 Genqo.spdc.covariance_matrix
-Genqo.spdc.loss_bsm_matrix_fid
-Genqo.spdc.dmijZ
 ```

@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "genqo"
-version = "1.2.0"
+version = "2.0.0"
 description = "Genqo.jl: A Hybrid Gaussian/Non-Gaussian Quantum Optics State Engine for Entanglement Source Modelling"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -42,10 +42,10 @@ test = [
 ]
 
 [project.urls]
-#Homepage = "https://github.com/JacobGunnell/genqo.jl"
-#Documentation = "https://genqo.rtfd.io/en/stable/"
-Repository = "https://github.com/JacobGunnell/genqo.jl"
-Issues = "https://github.com/JacobGunnell/genqo.jl/issues"
+Homepage = "https://github.com/QuantumSavory/Genqo.jl"
+Documentation = "https://quantumsavory.github.io/Genqo.jl/"
+Repository = "https://github.com/QuantumSavory/Genqo.jl"
+Issues = "https://github.com/QuantumSavory/Genqo.jl/issues"
 
 [tool.setuptools]
 packages = ["genqo"]

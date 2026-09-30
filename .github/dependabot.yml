@@ -1,0 +1,28 @@
+# https://docs.github.com/github/administering-a-repository/configuration-options-for-dependency-updates
+version: 2
+
+updates:
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: monthly
+    groups:
+      github-actions:
+        patterns: ["*"]
+    commit-message:
+      prefix: ci
+
+  # One entry per workspace project declared in the root Project.toml.
+  - package-ecosystem: julia
+    directories:
+      - /
+      - /docs
+      - /test
+      - /benchmark
+    schedule:
+      interval: monthly
+    groups:
+      julia-dependencies:
+        patterns: ["*"]
+    commit-message:
+      prefix: deps
