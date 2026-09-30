@@ -146,6 +146,7 @@ struct ClickProjector <: AbstractClickOperator
     clicks::Array{Int,2}
     function ClickProjector(clicks::Array{Int,2})
         all(clicks .≥ -1) || throw(ArgumentError("Click projector must be non-negative integers or -1 for traceout"))
+        allunique(Tuple(row) for row in eachrow(clicks)) || throw(ArgumentError("Click projector terms must be distinct"))
         size(clicks, 1) == 1 || allequal(outcome .== -1 for outcome in eachrow(clicks)) || throw(ArgumentError("Placement of traceout modes must be consistent across all click pattern terms"))
         new(clicks)
     end
