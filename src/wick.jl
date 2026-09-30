@@ -51,7 +51,10 @@ function _wick_partitions(N::Int8)::Array{Int8,3}
 end
 _wick_partitions(N::Int)::Array{Int8,3} = _wick_partitions(Int8(N))
 const _wick_partitions_cache = Ref(Dict{Int8, Array{Int8,3}}())
-wick_partitions(N::Int8)::Array{Int8,3} = get!(() -> _wick_partitions(N), _wick_partitions_cache[], N)
+const _wick_partitions_cache_lock = ReentrantLock()
+function wick_partitions(N::Int8)::Array{Int8,3}
+    @lock _wick_partitions_cache_lock get!(() -> _wick_partitions(N), _wick_partitions_cache[], N)
+end
 wick_partitions(N::Int)::Array{Int8,3} = wick_partitions(Int8(N)) # dispatch to Int8 version for caching
 
 
