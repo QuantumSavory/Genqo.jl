@@ -228,14 +228,48 @@ end
     # that has been through lazy arithmetic falls back to the generic dense path: still correct,
     # but it reads every entry. Sandwich the unscaled operator to stay sparse.
     let ρ = mk(), v = [0, 1, 1, 0] / √2
-        @test dot(v', (ρ * 4).data, ComplexF64.(v)) ≈ dot(v', 4 * D, ComplexF64.(v)) rtol = 1e-14
+        @test dot(v, (ρ * 4).data, ComplexF64.(v)) ≈ dot(v, 4 * D, ComplexF64.(v)) rtol = 1e-14
         @test ncomputed(ρ.data) == 16
     end
     let ρ = mk(), v = [0, 1, 1, 0] / √2
-        @test 4 * dot(v', ρ.data, ComplexF64.(v)) ≈ dot(v', 4 * D, ComplexF64.(v)) rtol = 1e-14
+        @test 4 * dot(v, ρ.data, ComplexF64.(v)) ≈ dot(v, 4 * D, ComplexF64.(v)) rtol = 1e-14
         @test ncomputed(ρ.data) == 4
     end
 
-    @test_throws DimensionMismatch dot(ones(3)', mk().data, ones(ComplexF64, 4))
-    @test_throws DimensionMismatch dot(ones(4)', mk().data, ones(ComplexF64, 3))
+    @test_throws DimensionMismatch dot(ones(3), mk().data, ones(ComplexF64, 4))
+    @test_throws DimensionMismatch dot(ones(4), mk().data, ones(ComplexF64, 3))
+end
+
+
+@testitem "dot conjugates complex bras like the stdlib" begin
+    using LinearAlgebra: dot
+
+    # A complex Hermitian matrix, so that a conjugation error anywhere changes the answer
+    H = [complex(1 + i * j, i^2 - j^2) for i in 1:4, j in 1:4]
+    @assert H == H'
+    mk() = LazyDensityMatrix((i, j) -> H[i, j], 4)
+    ref(x, y) = sum(conj(x[i]) * H[i, j] * y[j] for i in 1:4, j in 1:4) # ⟨x|H|y⟩, written out
+
+    x = ComplexF64[0.3 + 0.4im, 0, -0.5im, 0]
+    y = ComplexF64[0, 0.6 - 0.2im, 0.1im, 0.7]
+
+    # A plain-vector bra is conjugated exactly once, matching the stdlib and ⟨x|H|y⟩, and the sparse
+    # path still only reads the entries both vectors reach
+    let A = mk()
+        @test dot(x, A, y) ≈ ref(x, y) rtol = 1e-14
+        @test dot(x, A, y) ≈ dot(x, H, y) rtol = 1e-14
+        @test dot(x, A, y) ≈ x' * H * y rtol = 1e-14
+        @test ncomputed(A) == 2 * 3
+    end
+
+    # Hermiticity: swapping the vectors conjugates the result, and expectation values are real
+    @test dot(y, mk(), x) ≈ conj(dot(x, mk(), y)) rtol = 1e-14
+    @test abs(imag(dot(x, mk(), x))) ≤ 1e-14 * abs(dot(x, mk(), x))
+
+    # Row-vector bras follow the stdlib, which conjugates the row vector's entries as it would any
+    # other first argument: dot(x', H, y) is ⟨conj(x)|H|y⟩ and dot(transpose(x), H, y) is ⟨x|H|y⟩
+    @test dot(x', mk(), y) ≈ dot(x', H, y) rtol = 1e-14
+    @test dot(x', mk(), y) ≈ ref(conj(x), y) rtol = 1e-14
+    @test dot(transpose(x), mk(), y) ≈ dot(transpose(x), H, y) rtol = 1e-14
+    @test dot(transpose(x), mk(), y) ≈ ref(x, y) rtol = 1e-14
 end

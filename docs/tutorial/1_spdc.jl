@@ -69,7 +69,7 @@ function plot_spdc1_spin_fidelity()
     ρ = duankimble.(states, [[1,0,1,0]])
 
     ϕ⁻s = [1,0,0,-1] / √2 # Duan-Kimble loading maps the photonic ψ⁺ onto the spin-spin ϕ⁻
-    fidelity_ϕ⁻s(ρ::Operator) = dot(ϕ⁻s', ρ.data, ϕ⁻s) / tr(ρ) |> real
+    fidelity_ϕ⁻s(ρ::Operator) = dot(ϕ⁻s, ρ.data, ϕ⁻s) / tr(ρ) |> real
     Fs = fidelity_ϕ⁻s.(ρ)
 
     p = plot(

@@ -78,7 +78,7 @@ function plot_zalm2_spin_fidelity()
     ρ = duankimble.(states, [[1,0,1,0]]) .* 4
 
     ψ⁻s = [0,1,-1,0] / √2
-    fidelity_ψ⁻s(ρ::Operator) = dot(ψ⁻s', ρ.data, ψ⁻s) / tr(ρ) |> real
+    fidelity_ψ⁻s(ρ::Operator) = dot(ψ⁻s, ρ.data, ψ⁻s) / tr(ρ) |> real
     Fs = fidelity_ψ⁻s.(ρ)
 
     p = plot(
