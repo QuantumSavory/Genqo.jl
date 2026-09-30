@@ -19,6 +19,7 @@ end
 modeswap(::Type{T}, basis::SymplecticBasis{N}; ħ = 2) where {T,N<:Int} = modeswap(T, T, basis; ħ = ħ)
 function _modeswap(basis::QuadPairBasis{N}) where {N<:Int}
     nmodes = basis.nmodes
+    iseven(nmodes) || throw(ArgumentError("modeswap requires an even number of modes"))
     disp = falses(2*nmodes)
     symplectic = falses(2*nmodes, 2*nmodes)
     @inbounds for i in Base.OneTo(nmodes÷2)
@@ -31,6 +32,7 @@ function _modeswap(basis::QuadPairBasis{N}) where {N<:Int}
 end
 function _modeswap(basis::QuadBlockBasis{N}) where {N<:Int}
     nmodes = basis.nmodes
+    iseven(nmodes) || throw(ArgumentError("modeswap requires an even number of modes"))
     disp = falses(2*nmodes)
     symplectic = falses(2*nmodes, 2*nmodes)
     @inbounds for i in Base.OneTo(nmodes÷2)
