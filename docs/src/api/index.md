@@ -51,8 +51,8 @@ Evaluation compiles a symbolic moment polynomial per click pattern and contracts
 ```julia
 engine = HybridProjectionEngine(2)
 μ = 0.01:0.01:0.5
-st = eprstate(QuadBlockBasis(2), asinh.(√.μ), Float64(π))
-Pg = tr.(project.(st, projector([1,1])); engine)
+st = eprstate.(Ref(QuadBlockBasis(2)), asinh.(sqrt.(μ)), Float64(π))
+Pg = tr.(project.(st, Ref(projector([1,1]))); engine)
 ```
 
 [`duankimble`](@ref) and [`emissiveload`](@ref) go further and return a matrix whose
