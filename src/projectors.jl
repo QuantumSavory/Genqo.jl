@@ -354,9 +354,9 @@ function tr(projected_state::ProjectedPureGaussianState; engine::HybridProjectio
         nf = max.(n, 0) # Filter out -1 (traceout) modes
         invA, denom = _invA_UL(σ, η, n)
 
-        ηweight = prod(η .^ nf) # √η per detected photon, matching dot()'s per-click η factor
+        ηweight = prod(η .^ nf ./ factorial.(nf)) # √η per detected photon, matching dot()'s per-click η factor
         C = @lock engine.C_poly_cache_lock get!(engine.C_poly_cache, (nf, nf)) do
-            prod((α.*βc).^nf ./ factorial.(nf)) |> extract_W_terms
+            prod(α .^ nf) * prod(βc .^ nf) |> extract_W_terms
         end
 
         Tr += W(C, invA) * ηweight / denom
